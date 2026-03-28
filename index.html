@@ -1161,26 +1161,44 @@ function drawSegment(remainSecs, totalSecs) {
 */
 let timerStartedAt = null;   // Date.now() when last (re)started
 let timerLeftAtStart = 0;    // timerLeft value at that moment
-
+let notificationShown = false;
 function startTimer() {
   if (timerInterval) clearInterval(timerInterval);
+
+  // request notification permission on start
+  if (Notification && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+
   timerRunning     = true;
   timerStartedAt   = Date.now();
   timerLeftAtStart = timerLeft;
 
   timerInterval = setInterval(() => {
-    // Compute how much wall-clock time has passed since last start/resume
     const elapsed = Math.floor((Date.now() - timerStartedAt) / 1000);
     timerLeft = Math.max(0, timerLeftAtStart - elapsed);
+
     drawSegment(timerLeft, timerTotal);
 
     if (timerLeft <= 0) {
       clearInterval(timerInterval);
       timerInterval = null;
       timerRunning  = false;
-      openDoneModal();
+      handleTimerComplete();
     }
   }, 1000);
+}
+function showNotification() {
+  if (!Notification || Notification.permission !== 'granted') return;
+
+  const n = new Notification("Time's up", {
+    body: "Go stretch. You earned it."
+  });
+
+  n.onclick = () => {
+    window.focus();
+    openDoneModal();
+  };
 }
 
 function pauseTimer() {
@@ -1198,11 +1216,7 @@ function restartTimer() {
 
 
 /* ── 8. END-OF-TIMER MODAL + LOOPING ALARM ── */
-
-let alarmAudio    = null;   // the Audio object while alarm is ringing
-let alarmInterval = null;   // setInterval that replays the sound
-
-function openDoneModal() {
+function handleTimerComplete() {
   // Show modal
   document.getElementById('done-modal').classList.add('visible');
 
@@ -1210,21 +1224,40 @@ function openDoneModal() {
   startAlarm();
 }
 
+let audioCtx = null;
+let alarmInterval = null;
+
+function playBeep() {
+  try {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.value = 880;
+
+    gain.gain.value = 0.2;
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.5);
+  } catch (_) {}
+}
+
 function startAlarm() {
-  _playAlarmOnce();
-  alarmInterval = setInterval(_playAlarmOnce, 4000);
+  playBeep();
+  alarmInterval = setInterval(playBeep, 1500);
 }
 
 function stopAlarm() {
   clearInterval(alarmInterval);
   alarmInterval = null;
-  if (alarmAudio) {
-    alarmAudio.pause();
-    alarmAudio.currentTime = 0;
-    alarmAudio = null;
-  }
 }
-
 function _playAlarmOnce() {
   try {
     // Re-use the embedded audio data URI from playDone (now extracted to a const)
@@ -1259,22 +1292,26 @@ document.getElementById('modal-snooze-btn').addEventListener('click', () => {
    time. If the timer already finished while the tab was hidden, open the modal.
 */
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && timerRunning) {
-    // Timer is running — check if it expired while we were away
-    const elapsed = Math.floor((Date.now() - timerStartedAt) / 1000);
-    timerLeft = Math.max(0, timerLeftAtStart - elapsed);
-    drawSegment(timerLeft, timerTotal);
-
-    if (timerLeft <= 0 && timerRunning) {
-      // Expired while tab was hidden — stop the interval and open modal now
-      clearInterval(timerInterval);
-      timerInterval = null;
-      timerRunning  = false;
-      openDoneModal();
+  if (timerLeft <= 0) {
+  clearInterval(timerInterval);
+  timerInterval = null;
+  timerRunning = false;
+  handleTimerComplete();
+}
     }
-  }
-});
+  );
+function handleTimerComplete() {
+  startAlarm();
 
+  if (!notificationShown) {
+    showNotification();
+    notificationShown = true;
+  }
+
+  if (document.visibilityState === 'visible') {
+    openDoneModal();
+  }
+}
 
 /* ── playDone kept for backwards compat (now wraps openDoneModal) ── */
 function playDone() { openDoneModal(); }
