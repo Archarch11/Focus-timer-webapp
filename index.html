@@ -2091,11 +2091,16 @@
 
       n.onclick = () => {
         window.focus();
-        openDoneModal();
+        // Only act on this if the session hasn't already been resolved
+        // (e.g. user already clicked "I'll rest up" and is on the break screen).
+        if (timerCompletedAt !== null) openDoneModal();
       };
     }
 
     function openDoneModal() {
+      // Never open over the break screen — user is resting, leave them alone.
+      const breakScreen = document.getElementById('break-screen');
+      if (breakScreen && !breakScreen.classList.contains('hidden')) return;
       const modal = document.getElementById('done-modal');
       if (modal) {
         modal.classList.add('visible');
