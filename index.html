@@ -5,6 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Snooze Police</title>
+  <link rel="icon" type="image/png" href="Favicon.png">
   <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     *,
@@ -48,7 +49,6 @@
       justify-content: center;
       overflow: hidden;
       overscroll-behavior: none;
-      touch-action: none; /* blocks momentum scroll on Chrome Android without position:fixed */
     }
 
     /* ═══════════════════════════════════════════════════════
@@ -440,20 +440,15 @@
     @media (max-width: 768px) {
       .desktop-hint {
         display: flex;
-        align-items: center;
-        justify-content: center;
+        align-items: flex-start;
         gap: 7px;
         font-size: 14px;
         color: #8a7e78;
         font-style: italic;
-        text-align: center;
+        text-align: left;
         margin-bottom: 24px;
         font-family: var(--font);
         letter-spacing: 0.1px;
-      }
-      .desktop-hint svg {
-        flex-shrink: 0;
-        opacity: 0.75;
       }
     }
 
@@ -1024,7 +1019,7 @@
   ══════════════════════════════════════════════════ -->
     <div class="screen" id="setup-screen">
 
-      <p class="desktop-hint"><svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="7.5" cy="7.5" r="6.5" stroke="#8a7e78" stroke-width="1.4"/><line x1="7.5" y1="6.5" x2="7.5" y2="11" stroke="#8a7e78" stroke-width="1.4" stroke-linecap="round"/><circle cx="7.5" cy="4.5" r="0.9" fill="#8a7e78"/></svg>Best experienced on desktop</p>
+      <p class="desktop-hint">Desktop only (for now). Mobile browsers have some limitations</p>
 
       <div class="field-group">
         <label class="field-label">What should I call you?</label>
@@ -1383,7 +1378,7 @@
           </button>
         </div>
 
-        <p class="timer-tab-hint"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="7" cy="7" r="6" stroke="#7a6e67" stroke-width="1.4"/><line x1="7" y1="6" x2="7" y2="10.5" stroke="#7a6e67" stroke-width="1.4" stroke-linecap="round"/><circle cx="7" cy="4.2" r="0.85" fill="#7a6e67"/></svg>Keep this tab open for the alarm to work</p>
+        <p class="timer-tab-hint">Desktop only (for now). Mobile browsers have some limitations</p>
 
       </div><!-- /.timer-screen-inner -->
     </div>
@@ -1860,30 +1855,48 @@
       Workers run in a separate thread and are NOT subject to Chrome's "intensive
       throttling" that kills main-thread setTimeout in background tabs after 5 min.
       We create the worker from a Blob so the entire app stays a single HTML file.
+
+      On iOS Safari in private browsing mode, or under strict CSP, Worker creation
+      from blob: URLs can fail. We catch that and fall back to a plain setTimeout
+      so the timer always works — it just won't fire in the background on those
+      restricted environments.
     */
-    const _workerCode = `
-      var t = null;
-      self.onmessage = function(e) {
-        if (e.data.type === 'start') {
-          clearTimeout(t);
-          t = setTimeout(function() { self.postMessage({ type: 'done' }); }, e.data.ms);
-        } else if (e.data.type === 'stop') {
-          clearTimeout(t);
-          t = null;
-        }
+    let timerWorker = null;
+    let _timerFallbackTimeout = null; // used only when Worker is unavailable
+
+    try {
+      const _workerCode = `
+        var t = null;
+        self.onmessage = function(e) {
+          if (e.data.type === 'start') {
+            clearTimeout(t);
+            t = setTimeout(function() { self.postMessage({ type: 'done' }); }, e.data.ms);
+          } else if (e.data.type === 'stop') {
+            clearTimeout(t);
+            t = null;
+          }
+        };
+      `;
+      timerWorker = new Worker(
+        URL.createObjectURL(new Blob([_workerCode], { type: 'text/javascript' }))
+      );
+      timerWorker.onmessage = (e) => {
+        if (e.data.type !== 'done') return;
+        if (!timerRunning) return; // rAF already handled it
+        timerRunning = false;
+        cancelAnimationFrame(timerRAF); timerRAF = null;
+        stopAudioKeepalive();
+        handleTimerComplete();
       };
-    `;
-    const timerWorker = new Worker(
-      URL.createObjectURL(new Blob([_workerCode], { type: 'text/javascript' }))
-    );
-    timerWorker.onmessage = (e) => {
-      if (e.data.type !== 'done') return;
-      if (!timerRunning) return; // rAF already handled it
-      timerRunning = false;
-      cancelAnimationFrame(timerRAF); timerRAF = null;
-      stopAudioKeepalive();
-      handleTimerComplete();
-    };
+      timerWorker.onerror = () => { timerWorker = null; }; // treat as unavailable on runtime error
+    } catch (e) {
+      timerWorker = null; // Worker unavailable — fallback to setTimeout used in startTimer
+    }
+
+    /* Safe wrapper — won't throw if Worker is null or crashed */
+    function workerPost(msg) {
+      if (timerWorker) { try { timerWorker.postMessage(msg); } catch(e) {} }
+    }
 
     /* Silent-audio keepalive — keeps AudioContext "playing" so Android Chrome
        doesn't suspend it when the tab is backgrounded.
@@ -1931,7 +1944,8 @@
         if (timerLeft <= 0) {
           timerRAF = null;
           timerRunning = false;
-          timerWorker.postMessage({ type: 'stop' }); // cancel backup — we're handling it
+          workerPost({ type: 'stop' }); // cancel backup — we're handling it
+          if (_timerFallbackTimeout) { clearTimeout(_timerFallbackTimeout); _timerFallbackTimeout = null; }
           stopAudioKeepalive();
           handleTimerComplete();
           return;
@@ -1943,7 +1957,9 @@
 
     function startTimer() {
       if (timerRAF) cancelAnimationFrame(timerRAF);
-      timerWorker.postMessage({ type: 'stop' }); // cancel any previous backup
+      // Cancel any previous backup (safe even if worker is null)
+      workerPost({ type: 'stop' });
+      if (_timerFallbackTimeout) { clearTimeout(_timerFallbackTimeout); _timerFallbackTimeout = null; }
 
       if (Notification && Notification.permission === 'default') {
         Notification.requestPermission();
@@ -1957,11 +1973,22 @@
       // rAF: smooth visual updates at 60fps when tab is active
       timerRAF = requestAnimationFrame(tick);
 
-      // Backup worker timer: fires handleTimerComplete even when rAF is paused.
-      // Web Workers are NOT subject to Chrome's "intensive throttling" in background
-      // tabs — unlike main-thread setTimeout, they fire accurately at any time.
-      // +500ms so rAF gets first shot when the tab is active.
-      timerWorker.postMessage({ type: 'start', ms: timerLeft * 1000 + 500 });
+      // Backup: prefer Web Worker (immune to Chrome intensive throttling in background).
+      // Fall back to plain setTimeout if Worker is unavailable (iOS private browsing,
+      // strict CSP, etc.) — this still fires correctly when the tab is active,
+      // and for short timers; longer background sessions may be throttled on mobile.
+      if (timerWorker) {
+        workerPost({ type: 'start', ms: timerLeft * 1000 + 500 });
+      } else {
+        _timerFallbackTimeout = setTimeout(() => {
+          if (!timerRunning) return;
+          timerRunning = false;
+          cancelAnimationFrame(timerRAF); timerRAF = null;
+          _timerFallbackTimeout = null;
+          stopAudioKeepalive();
+          handleTimerComplete();
+        }, timerLeft * 1000 + 500);
+      }
 
       // Keep AudioContext alive so Android Chrome can play the alarm while backgrounded.
       // We create alarmCtx here too — startTimer is always called from a click handler
@@ -1976,7 +2003,8 @@
 
     function pauseTimer() {
       if (timerRAF) { cancelAnimationFrame(timerRAF); timerRAF = null; }
-      timerWorker.postMessage({ type: 'stop' });
+      workerPost({ type: 'stop' });
+      if (_timerFallbackTimeout) { clearTimeout(_timerFallbackTimeout); _timerFallbackTimeout = null; }
       stopAudioKeepalive();
       timerRunning = false;
     }
@@ -2057,7 +2085,8 @@
       if (!Notification || Notification.permission !== 'granted') return;
 
       const n = new Notification("Time's up", {
-        body: "Go stretch. You earned it."
+        body: "Go stretch. You earned it.",
+        icon: "Favicon.png"
       });
 
       n.onclick = () => {
@@ -2407,7 +2436,8 @@
         drawSegment(timerLeft, timerTotal);
         if (timerLeft <= 0) {
           cancelAnimationFrame(timerRAF); timerRAF = null;
-          timerWorker.postMessage({ type: 'stop' });
+          workerPost({ type: 'stop' });
+          if (_timerFallbackTimeout) { clearTimeout(_timerFallbackTimeout); _timerFallbackTimeout = null; }
           timerRunning = false;
           stopAudioKeepalive();
           handleTimerComplete();
@@ -2421,6 +2451,18 @@
         // Case B: timer already done, re-fire alarm + ensure modal is visible
         if (!alarmActive) startAlarm();
         openDoneModal();
+      } else if (breakInterval !== null && breakStartedAt !== null) {
+        // Case C: user is on the break screen — resync display immediately from
+        // wall clock so background throttling doesn't leave a stale countdown.
+        const elapsed = Math.floor((Date.now() - breakStartedAt) / 1000);
+        breakLeft = Math.max(0, breakTotalSecs - elapsed);
+        const display = document.getElementById('break-timer-display');
+        display.textContent = fmtTime(breakLeft);
+        if (breakLeft <= 0) {
+          clearInterval(breakInterval);
+          breakInterval = null;
+          display.classList.add('break-done');
+        }
       }
     });
 
@@ -2509,6 +2551,8 @@
     /* ── BREAK SCREEN ── */
     let breakInterval = null;
     let breakLeft = 0;
+    let breakStartedAt = null;   // wall-clock anchor — immune to interval throttling
+    let breakTotalSecs = 0;
 
     function fmtTime(secs) {
       const m = Math.floor(secs / 60);
@@ -2522,6 +2566,9 @@
       pauseTimer();
       isPaused = false;
       setPauseUI(false);
+      // Clear the completed flag so visibilitychange never re-fires the alarm
+      // or re-opens the done modal while the user is resting on this screen.
+      timerCompletedAt = null;
 
       document.getElementById('setup-screen').classList.add('hidden');
       document.getElementById('timer-screen').classList.add('hidden');
@@ -2530,13 +2577,17 @@
       // Reset display
       const display = document.getElementById('break-timer-display');
       display.classList.remove('break-done');
-      breakLeft = breakMins * 60;
+      breakTotalSecs = breakMins * 60;
+      breakLeft = breakTotalSecs;
+      breakStartedAt = Date.now();
       display.textContent = fmtTime(breakLeft);
 
-      // Start break countdown
+      // Start break countdown using wall-clock time so background throttling
+      // doesn't make the display lie. Each tick reads Date.now() directly.
       if (breakInterval) clearInterval(breakInterval);
       breakInterval = setInterval(() => {
-        breakLeft = Math.max(0, breakLeft - 1);
+        const elapsed = Math.floor((Date.now() - breakStartedAt) / 1000);
+        breakLeft = Math.max(0, breakTotalSecs - elapsed);
         display.textContent = fmtTime(breakLeft);
         if (breakLeft <= 0) {
           clearInterval(breakInterval);
@@ -2562,7 +2613,8 @@
       snoozeCount = 0;
       hasUsedFullResistance = false;
       timerCompletedAt = null;
-      timerWorker.postMessage({ type: 'stop' });
+      workerPost({ type: 'stop' });
+      if (_timerFallbackTimeout) { clearTimeout(_timerFallbackTimeout); _timerFallbackTimeout = null; }
       pauseBtn.innerHTML = PAUSE_ICON + ' Pause';
       document.getElementById('setup-screen').classList.add('hidden');
       document.getElementById('timer-screen').classList.remove('hidden');
