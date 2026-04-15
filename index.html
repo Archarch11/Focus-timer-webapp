@@ -1,0 +1,2604 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Snooze Police</title>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* Prevent any page scroll — must be on BOTH html and body for all mobile browsers.
+       overscroll-behavior:none kills the rubber-band bounce on iOS/Android Chrome. */
+    html {
+      overflow: hidden;
+      height: 100%;
+      overscroll-behavior: none;
+    }
+
+    :root {
+      --bg: #eae4db;
+      --ink: #262626;
+      --white: #fafafa;
+      --pink: #f5c6d2;
+      --orange: #f5c08a;
+      --font: 'Chakra Petch', sans-serif;
+      --field-h: 77px;
+      --field-inner-top: 9px;
+      --field-inner-bot: 70px;
+      --pill-h: 46px;
+      --pill-inner-top: 1px;
+      --pill-inner-bot: 41px;
+    }
+
+    body {
+      background: #F5EFE7;
+      font-family: var(--font);
+      color: var(--ink);
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      overscroll-behavior: none;
+      touch-action: none; /* blocks momentum scroll on Chrome Android without position:fixed */
+    }
+
+    /* ═══════════════════════════════════════════════════════
+   SCREEN SYSTEM
+═══════════════════════════════════════════════════════ */
+    .app {
+      width: 100%;
+      max-width: 520px;
+      height: 100%;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .screen {
+      width: 100%;
+      padding: 52px 36px 56px;
+      display: flex;
+      flex-direction: column;
+      position: absolute;
+      transition: none;
+    }
+
+    .screen.hidden {
+      opacity: 0;
+      pointer-events: none;
+      transform: none;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+   SETUP SCREEN
+═══════════════════════════════════════════════════════ */
+    .field-group {
+      margin-bottom: 36px;
+    }
+
+    .field-label {
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--ink);
+      margin-bottom: 4px;
+      display: block;
+      line-height: 1.2;
+    }
+
+    .hd-shell {
+      position: relative;
+      height: var(--field-h);
+      width: 100%;
+    }
+
+    .hd-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      display: block;
+    }
+
+    .hd-content {
+      position: absolute;
+      top: var(--field-inner-top);
+      bottom: calc(var(--field-h) - var(--field-inner-bot));
+      left: 0;
+      right: 0;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+    }
+
+    .name-content input {
+      width: 100%;
+      background: transparent;
+      border: none;
+      outline: none;
+      font-family: var(--font);
+      font-size: 17px;
+      font-weight: 500;
+      color: var(--ink);
+      line-height: 1;
+    }
+
+    .name-content input::placeholder {
+      color: #b0a89f;
+      font-weight: 400;
+    }
+
+    .stepper-content {
+      width: 100%;
+      display: flex;
+      align-items: center;
+    }
+
+    .stepper-btn {
+      width: 36px;
+      height: 36px;
+      flex-shrink: 0;
+      border: none;
+      background: transparent;
+      font-family: var(--font);
+      font-size: 22px;
+      color: var(--ink);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      transition: background 0.1s;
+      user-select: none;
+      line-height: 1;
+      padding: 0;
+    }
+
+    /* Chakra Petch glyph corrections */
+    .stepper-btn:first-child {
+      padding-top: 2px;
+    }
+
+    /* − nudge up slightly */
+    .stepper-btn:last-child {
+      padding-bottom: 8px;
+    }
+
+    /* + glyph hangs low — push up harder */
+    .stepper-btn:hover {
+      background: rgba(38, 38, 38, 0.07);
+    }
+
+    .stepper-btn:active {
+      background: rgba(38, 38, 38, 0.14);
+    }
+
+    .stepper-value {
+      flex: 1;
+      text-align: center;
+      font-size: 17px;
+      font-weight: 500;
+      color: var(--ink);
+      position: relative;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: text;
+    }
+
+    .stepper-value span {
+      pointer-events: none;
+      user-select: none;
+      line-height: 1;
+    }
+
+    .stepper-value input {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      border: none;
+      outline: none;
+      font-family: var(--font);
+      font-size: 17px;
+      font-weight: 500;
+      color: #b0a89f;
+      /* starts gray, JS changes to #262626 on typing */
+      text-align: center;
+      display: none;
+      padding: 0;
+      line-height: 1;
+    }
+
+    .presets {
+      display: flex;
+      gap: 9px;
+      margin-top: 12px;
+    }
+
+    .pill-shell {
+      flex: 1;
+      position: relative;
+      height: var(--pill-h);
+    }
+
+    .pill-shell .hd-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      display: block;
+    }
+
+    .pill-shell button {
+      position: absolute;
+      top: var(--pill-inner-top);
+      bottom: calc(var(--pill-h) - var(--pill-inner-bot));
+      left: 0;
+      right: 0;
+      border: none;
+      background: transparent;
+      font-family: var(--font);
+      font-size: 17px;
+      font-weight: 400;
+      color: var(--ink);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      transition: opacity 0.1s;
+      z-index: 1;
+    }
+
+    .pill-shell button:active {
+      opacity: 0.65;
+    }
+
+    .hint {
+      font-size: 12px;
+      color: #7a6e67;
+      margin-top: 5px;
+      padding-left: 2px;
+      font-style: italic;
+      opacity: 0;
+      transition: opacity 0.2s;
+      pointer-events: none;
+    }
+
+    .hint.visible {
+      opacity: 1;
+    }
+
+    /* Inline helper message — between field and pills; zero height when empty */
+    .field-msg {
+      font-size: 12px;
+      color: #7a6e67;
+      font-style: italic;
+      font-family: var(--font);
+      max-height: 0;
+      overflow: hidden;
+      opacity: 0;
+      margin: 0;
+      padding: 0;
+      transition: max-height 0.2s ease, opacity 0.2s ease, margin 0.2s ease;
+      pointer-events: none;
+    }
+
+    .field-msg.visible {
+      max-height: 30px;
+      opacity: 1;
+      margin-top: 6px;
+      margin-bottom: 2px;
+    }
+
+    /* Disabled stepper button */
+    .stepper-btn:disabled,
+    .stepper-btn.disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    /* Back button row — screen edge, clearly left of the content column */
+    .timer-back-row {
+      position: absolute;
+      top: 44px;
+      left: 18px;
+    }
+
+    .timer-back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: none;
+      background: transparent;
+      font-family: var(--font);
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--ink);
+      cursor: pointer;
+      padding: 0;
+      letter-spacing: 0.1px;
+    }
+
+    .timer-back-btn:hover {
+      opacity: 0.7;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+   TIMER SCREEN
+═══════════════════════════════════════════════════════ */
+    #timer-screen {
+      padding: 0;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    .timer-screen-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      /* Reduced from 80px — clock should sit higher, not float in dead space */
+      padding: 44px 36px 40px;
+    }
+
+    /* Clock SVG */
+    .clock-svg {
+      width: 390px;
+      height: 390px;
+      display: block;
+      transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+        margin-bottom 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+      transform-origin: center top;
+      /* No bottom margin by default */
+      margin-bottom: 0;
+    }
+
+    /*
+  Pause state: scale(0.72) — slightly larger than before so clock stays prominent.
+  Visual height = 390 × 0.72 = 280.8px  →  dead space = 109px.
+  translateY(-16px) pulls it up slightly from transform-origin:center top.
+*/
+    .timer-screen-inner.is-paused .clock-svg {
+      transform: scale(0.72) translateY(-16px);
+      margin-bottom: -109px;
+    }
+
+    /* Work duration slot: scale down a touch so the clock reads as the hero */
+    .timer-screen-inner.is-paused #pause-work-slot {
+      transform: scale(0.93) translateY(0);
+      transform-origin: center top;
+    }
+
+    /*
+  Slot that receives the real #work-field-group DOM node on pause.
+  Hidden by default; fades + slides in when .visible is added.
+*/
+    #pause-work-slot {
+      width: 100%;
+      max-width: 420px;
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      /* No top gap — clock margin-bottom compensation handles the spacing */
+      margin-top: 0;
+    }
+
+    #pause-work-slot.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    /* Tighten field-group when it lives inside the slot */
+    #pause-work-slot .field-group {
+      margin-bottom: 0;
+    }
+
+    /* Work duration field on timer screen */
+    .timer-work-field {
+      width: 100%;
+      max-width: 420px;
+      margin-top: 28px;
+    }
+
+    .timer-work-label {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--ink);
+      margin-bottom: 4px;
+      display: block;
+    }
+
+    /* Mobile-only hint — hidden by default, shown via media query */
+    .timer-tab-hint {
+      display: none;
+    }
+
+    /* Desktop hint — always hidden; shown only on real mobile via its own media query below */
+    .desktop-hint {
+      display: none;
+    }
+
+    /* Show "Best experienced on desktop" only on actual mobile screens (≤ 768px) */
+    @media (max-width: 768px) {
+      .desktop-hint {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        font-size: 14px;
+        color: #8a7e78;
+        font-style: italic;
+        text-align: center;
+        margin-bottom: 24px;
+        font-family: var(--font);
+        letter-spacing: 0.1px;
+      }
+      .desktop-hint svg {
+        flex-shrink: 0;
+        opacity: 0.75;
+      }
+    }
+
+    /* ── Timer buttons — clean rectangle, matches reference screenshot ── */
+    .timer-btns {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      margin-top: 56px;
+    }
+
+    .timer-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      height: 56px;
+      min-width: 160px;
+      padding: 0 28px;
+      background: #F5EDE3;
+      border: 1.5px solid #d4cdc5;
+      border-radius: 2px;
+      box-shadow: 3px 4px 0px rgba(0, 0, 0, 0.12);
+      font-family: var(--font);
+      font-size: 17px;
+      font-weight: 500;
+      color: var(--ink);
+      cursor: pointer;
+      letter-spacing: 0.1px;
+      transition: transform 0.07s, box-shadow 0.07s;
+    }
+
+    .timer-btn:hover {
+      background: #ede6dc;
+    }
+
+    .timer-btn:active {
+      transform: translate(2px, 3px);
+      box-shadow: 1px 1px 0px rgba(0, 0, 0, 0.08);
+    }
+
+    .timer-btn svg {
+      flex-shrink: 0;
+    }
+
+
+    /* Start button */
+    .start-wrap {
+      display: flex;
+      justify-content: center;
+      margin-top: 24px;
+      padding-bottom: 4px;
+    }
+
+    .start-btn {
+      position: relative;
+      width: 220px;
+      height: 50px;
+      background: #6AADEE;
+      border-radius: 2px;
+      font-family: var(--font);
+      font-size: 17px;
+      font-weight: 500;
+      color: #1a1a1a;
+      cursor: pointer;
+      letter-spacing: 0.3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-top: none;
+      border-left: none;
+      border-right: 2px solid #2a2a2a;
+      border-bottom: 2px solid #2a2a2a;
+      box-shadow: 3px 3px 0 0 #2a2a2a;
+      transition: box-shadow 0.07s, transform 0.07s;
+    }
+
+    .start-btn:hover {
+      background: #7abcf5;
+    }
+
+    .start-btn:active {
+      transform: translate(3px, 3px);
+      box-shadow: 0 0 0 0 #2a2a2a;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+   END-OF-TIMER MODAL
+═══════════════════════════════════════════════════════ */
+
+    /* Full-screen backdrop — sits above everything */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(180, 170, 158, 0.72);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      /* Hidden by default */
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    .modal-backdrop.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* Modal card */
+    .modal-card {
+      background: #FAFAF8;
+      border: none;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.10);
+      border-radius: 0;
+      width: min(480px, calc(100vw - 48px));
+      padding: 36px 32px 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      transform: translateY(12px);
+      transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .modal-backdrop.visible .modal-card {
+      transform: translateY(0);
+    }
+
+    /* Cards that are buried under a newer popup — subtle 20% black tint */
+    .modal-card.stacked-behind {
+      filter: brightness(0.82);
+      box-shadow: none !important;
+      outline: 1.5px solid rgba(0,0,0,0.18);
+      transition: filter 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    /* Toast notification */
+    .snooze-toast {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translate(-50%, calc(-100% - 16px));
+      background: #2C2C2C;
+      color: #FAFAF8;
+      font-family: var(--font);
+      font-size: 16px;
+      font-weight: 500;
+      padding: 13px 26px;
+      border-radius: 8px;
+      border: none;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.28);
+      z-index: 999;
+      transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+      white-space: nowrap;
+    }
+    .snooze-toast.visible {
+      transform: translate(-50%, 0);
+    }
+
+    .modal-heading {
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--ink);
+      text-align: center;
+      line-height: 1.4;
+      margin-bottom: 20px;
+    }
+
+    .modal-subtext {
+      font-size: 15px;
+      font-weight: 400;
+      color: #5a5047;
+      text-align: center;
+      line-height: 1.4;
+      margin-bottom: 20px;
+    }
+
+    /* Image area */
+    .modal-img {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border-radius: 3px;
+      overflow: hidden;
+      background: #e8e0d8;
+      margin-bottom: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-img img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;   /* never stretches portrait GIFs */
+      background: #000;      /* black bars fill remaining space */
+      display: block;
+    }
+
+    /* Placeholder when no image */
+    .modal-img-placeholder {
+      font-size: 13px;
+      color: #9a9188;
+      font-style: italic;
+    }
+
+    /* Button row */
+    .modal-btns {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      width: 100%;
+    }
+
+    /* "Snooze" — same style as Pause/Restart */
+    .modal-snooze-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      height: 56px;
+      min-width: 140px;
+      padding: 0 24px;
+      background: #F5EDE3;
+      border: 1.5px solid #d4cdc5;
+      border-radius: 2px;
+      box-shadow: 3px 4px 0px rgba(0, 0, 0, 0.12);
+      font-family: var(--font);
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--ink);
+      cursor: pointer;
+      letter-spacing: 0.1px;
+      white-space: nowrap;
+      transition: transform 0.07s, box-shadow 0.07s;
+    }
+
+    .modal-snooze-btn:hover {
+      background: #ede6dc;
+    }
+
+    .modal-snooze-btn:active {
+      transform: translate(2px, 3px);
+      box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.08);
+    }
+
+    /* "I'll rest up" — same style as Start Session */
+    .modal-rest-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 56px;
+      min-width: 160px;
+      padding: 0 28px;
+      background: #6AADEE;
+      border-radius: 2px;
+      border-top: none;
+      border-left: none;
+      border-right: 2px solid #2a2a2a;
+      border-bottom: 2px solid #2a2a2a;
+      box-shadow: 3px 3px 0 0 #2a2a2a;
+      font-family: var(--font);
+      font-size: 16px;
+      font-weight: 600;
+      color: #1a1a1a;
+      cursor: pointer;
+      letter-spacing: 0.2px;
+      white-space: nowrap;
+      transition: box-shadow 0.07s, transform 0.07s;
+    }
+
+    /* Resistance level sizing for rest button */
+    .modal-rest-btn.rest-lvl-1 {
+      font-size: 19px;
+      padding: 0 36px;
+      height: 64px;
+    }
+    .modal-rest-btn.rest-lvl-2 {
+      font-size: 21px;
+      font-weight: 500;
+      padding: 0 44px;
+      height: 72px;
+      box-shadow: 4px 4px 0 0 #2a2a2a;
+    }
+
+    @keyframes restPulse {
+      0%, 100% { transform: scale(1); }
+      50%       { transform: scale(1.05); }
+    }
+    .rest-pulse {
+      animation: restPulse 2s ease-in-out 0.6s infinite;
+    }
+    .rest-pulse:active {
+      animation: none;
+    }
+
+    .modal-rest-btn:hover {
+      background: #7abcf5;
+    }
+
+    .modal-rest-btn:active {
+      transform: translate(3px, 3px);
+      box-shadow: 0 0 0 0 #2a2a2a;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       BREAK SCREEN
+    ═══════════════════════════════════════════════════════ */
+    #break-screen {
+      padding: 0;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    .break-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      background: #FAFAF8;
+      border-radius: 0;
+      border: 2px solid #2C2C2C;
+      padding: 52px 48px 48px;
+      width: min(680px, calc(100vw - 48px));
+      gap: 0;
+    }
+
+    .break-timer-display {
+      font-size: 80px;
+      font-weight: 500;
+      font-family: var(--font);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      line-height: 1;
+      margin-bottom: 28px;
+    }
+
+    .break-copy {
+      font-size: 18px;
+      font-weight: 400;
+      color: var(--ink);
+      line-height: 1.55;
+      margin-bottom: 36px;
+    }
+
+    .break-back-btn {
+      position: relative;
+      width: 220px;
+      height: 50px;
+      background: #6AADEE;
+      border-radius: 2px;
+      font-family: var(--font);
+      font-size: 17px;
+      font-weight: 500;
+      color: #1a1a1a;
+      cursor: pointer;
+      letter-spacing: 0.3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-top: none;
+      border-left: none;
+      border-right: 2px solid #2a2a2a;
+      border-bottom: 2px solid #2a2a2a;
+      box-shadow: 3px 3px 0 0 #2a2a2a;
+      transition: box-shadow 0.07s, transform 0.07s;
+    }
+
+    .break-back-btn:hover {
+      background: #7abcf5;
+    }
+
+    .break-back-btn:active {
+      transform: translate(3px, 3px);
+      box-shadow: 0 0 0 0 #2a2a2a;
+    }
+
+    /* When timer reaches 0, gentle pulse to nudge user back */
+    .break-timer-display.break-done {
+      animation: breakDonePulse 2.4s ease-in-out infinite;
+    }
+
+    @keyframes breakDonePulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.45; }
+    }
+
+    /* ═══════════════════════════════════════════════════════
+   MOBILE RESPONSIVE — max-width: 540px
+═══════════════════════════════════════════════════════ */
+    @media (max-width: 540px) {
+
+      /*
+        On mobile the .app becomes the scroll container instead of the document.
+        - overflow-y:auto  → allows internal scroll when content is taller than viewport
+        - overscroll-behavior:contain → scroll bounce stays inside .app, never bubbles
+          to document (no rubber-band bounce on Android; iOS handles it naturally)
+        - align-items:flex-start → screen flows from top; justify-content on .screen
+          centres short content vertically within the available height
+      */
+      .app {
+        align-items: flex-start;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+      }
+
+      /*
+        Screens flow normally on mobile so .app can scroll them.
+        position:absolute would take them out of flow → .app scrollHeight stays
+        at viewport height → nothing to scroll even when content overflows.
+        min-height:100% ensures short screens still fill the full viewport.
+      */
+      .screen {
+        position: relative;
+        min-height: 100%;
+        padding: 48px 24px 52px;
+        justify-content: center; /* centre content when screen is taller than content */
+      }
+
+      /* Hidden screens completely removed from flow (vs. just opacity:0 on desktop) */
+      .screen.hidden {
+        display: none;
+      }
+
+      /* === TIMER SCREEN === */
+      #timer-screen {
+        padding: 0;
+      }
+
+      .timer-screen-inner {
+        padding: 48px 24px 40px;
+      }
+
+      /* Back button — stay left but don't clip */
+      .timer-back-row {
+        top: 18px;
+        left: 16px;
+      }
+
+      /* Clock SVG: shrink to fit both viewport width AND height, keep it square */
+      .clock-svg {
+        width: min(340px, calc(100vw - 48px), calc(100svh - 260px));
+        height: min(340px, calc(100vw - 48px), calc(100svh - 260px));
+      }
+
+      /*
+        Paused state: same scale(0.72) but margin-bottom recalculated for mobile clock size.
+        Dead space = clock_size × (1 - 0.72) = clock_size × 0.28
+        Using calc with the same formula as the width above.
+      */
+      .timer-screen-inner.is-paused .clock-svg {
+        transform: scale(0.72) translateY(-12px);
+        margin-bottom: calc(min(340px, calc(100vw - 48px), calc(100svh - 260px)) * -0.28);
+      }
+
+      /* Timer buttons — smaller on mobile */
+      .timer-btns {
+        margin-top: 36px;
+        gap: 12px;
+      }
+
+      .timer-btn {
+        min-width: 130px;
+        height: 50px;
+        padding: 0 20px;
+        font-size: 15px;
+      }
+
+      /* === BREAK SCREEN === */
+      .break-inner {
+        padding: 40px 28px 36px;
+        width: calc(100vw - 32px);
+      }
+
+      .break-timer-display {
+        font-size: 60px;
+        margin-bottom: 20px;
+      }
+
+      .break-copy {
+        font-size: 16px;
+        margin-bottom: 28px;
+      }
+
+      /* === MOBILE HINT === */
+      .timer-tab-hint {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        font-size: 13px;
+        color: #7a6e67;
+        font-style: italic;
+        text-align: center;
+        margin-top: 20px;
+        font-family: var(--font);
+        letter-spacing: 0.1px;
+      }
+
+      /* === MODALS === */
+      /*
+        On mobile, swap from flex-center to flex-start so margin-left offset
+        is measured from the left edge (not from center), preventing right-side overflow.
+        With step=10px and card=calc(100vw-48px), max offset at level 3 = 30px:
+        16 + 30 + (375-48) = 16 + 30 + 327 = 373px — safely within 375px.
+      */
+      .modal-backdrop {
+        justify-content: flex-start;
+        align-items: center;
+        padding-left: 16px;
+      }
+
+      .modal-card {
+        width: calc(100vw - 48px);
+        padding: 28px 22px 24px;
+        max-height: calc(100vh - 48px);
+        overflow-y: auto;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+
+    <!-- SVG Templates -->
+    <template id="tpl-border">
+      <svg class="hd-svg" viewBox="0 0 474 77" preserveAspectRatio="none" fill="none"
+        xmlns="http://www.w3.org/2000/svg">
+        <path
+          d="M24.3962 14.7804H2.03639C2.10747 16.8769 2.16292 20.1209 2.20281 25.5717C2.29841 54.4142 1.83924 74.7388 4.6516 75.5315C8.41374 76.5919 29.6819 76.9788 58.1179 76.6188C68.1829 76.4914 69.8877 76.3396 132.631 74.706C195.375 73.0725 315.517 75.1345 381.79 72.7259C448.063 70.3172 460.103 68.5763 466.024 67.1662C471.945 65.7561 471.712 64.7105 471.507 62.1129C470.448 48.6721 480.72 11.4077 464.501 9.77749C459.429 9.26772 449.787 9.63461 435.094 9.7377C401.244 9.9752 380.176 9.46579 364.472 8.68914C350.669 8.0065 325.696 6.99861 304.322 6.79126C282.949 6.58391 265.697 7.15965 250.318 8.48173C234.939 9.8038 221.783 11.6653 210.361 13.824C210.361 13.824 173.983 17.3184 149.489 15.4518C138.454 14.611 121.972 16.1233 99.674 15.4518C77.376 14.7804 42.1267 14.7804 24.3962 14.7804Z"
+          fill="#262626" />
+        <path
+          d="M24.2463 8.78038H2.02823C2.09886 10.8769 2.15396 14.1209 2.19359 19.5717C2.28859 48.4142 1.83233 68.7388 4.62685 69.5315C8.36514 70.5919 29.4984 70.9788 57.754 70.6188C67.7552 70.4914 69.4492 70.3396 131.795 68.706C194.141 67.0725 313.52 69.1345 379.373 66.7259C445.226 64.3172 457.19 62.5763 463.073 61.1662C468.956 59.7561 468.725 58.7105 468.521 56.1129C467.469 42.6721 477.676 5.4077 461.56 3.77749C456.52 3.26772 446.939 3.63461 432.339 3.7377C398.704 3.9752 377.77 3.46579 362.165 2.68914C348.449 2.0065 323.635 0.998614 302.397 0.791263C281.159 0.583913 264.017 1.15965 248.735 2.48173C233.454 3.8038 220.381 5.66534 209.032 7.824C209.032 7.824 172.884 11.3184 148.545 9.45185C137.581 8.61097 121.203 10.1233 99.0465 9.45185C76.89 8.78038 41.8642 8.78038 24.2463 8.78038Z"
+          fill="#FAFAFA" />
+        <path
+          d="M2.02823 8.78038C2.23224 8.78038 6.6283 8.78038 24.2463 8.78038C41.8642 8.78038 76.89 8.78038 99.0465 9.45185C121.203 10.1233 137.581 8.61097 148.545 9.45185C172.884 11.3184 209.032 7.824 209.032 7.824C220.381 5.66534 233.454 3.8038 248.735 2.48173C264.017 1.15965 281.159 0.583913 302.397 0.791263C323.635 0.998614 348.449 2.0065 362.165 2.68914C377.77 3.46579 398.704 3.9752 432.339 3.7377C446.939 3.63461 456.52 3.26772 461.56 3.77749C477.676 5.4077 467.469 42.6721 468.521 56.1129C468.725 58.7105 468.956 59.7561 463.073 61.1662C457.19 62.5763 445.226 64.3172 379.373 66.7259C313.52 69.1345 194.14 67.0725 131.795 68.706C69.4492 70.3396 67.7552 70.4914 57.754 70.6188C29.4984 70.9788 8.36514 70.5919 4.62685 69.5315C1.83233 68.7388 2.28859 48.4142 2.19359 19.5717C2.11682 9.01336 1.98202 6.73501 1.78872 5.03823C1.59542 3.34144 1.3477 2.29526 0.750244 0.848555"
+          stroke="#262626" stroke-width="1.5" stroke-linecap="round" />
+        <path
+          d="M24.2463 8.78038H2.02823C2.09886 10.8769 2.15396 14.1209 2.19359 19.5717C2.28859 48.4142 1.83233 68.7388 4.62685 69.5315C8.36514 70.5919 29.4984 70.9788 57.754 70.6188C67.7552 70.4914 69.4492 70.3396 131.795 68.706C194.141 67.0725 313.52 69.1345 379.373 66.7259C445.226 64.3172 457.19 62.5763 463.073 61.1662C468.956 59.7561 468.725 58.7105 468.521 56.1129C467.469 42.6721 477.676 5.4077 461.56 3.77749C456.52 3.26772 446.939 3.63461 432.339 3.7377C398.704 3.9752 377.77 3.46579 362.165 2.68914C348.449 2.0065 323.635 0.998614 302.397 0.791263C281.159 0.583913 264.017 1.15965 248.735 2.48173C233.454 3.8038 220.381 5.66534 209.032 7.824C209.032 7.824 172.884 11.3184 148.545 9.45185C137.581 8.61097 121.203 10.1233 99.0465 9.45185C76.89 8.78038 41.8642 8.78038 24.2463 8.78038Z"
+          fill="#FAFAFA" />
+        <path
+          d="M2.02823 8.78038C2.23224 8.78038 6.6283 8.78038 24.2463 8.78038C41.8642 8.78038 76.89 8.78038 99.0465 9.45185C121.203 10.1233 137.581 8.61097 148.545 9.45185C172.884 11.3184 209.032 7.824 209.032 7.824C220.381 5.66534 233.454 3.8038 248.735 2.48173C264.017 1.15965 281.159 0.583913 302.397 0.791263C323.635 0.998614 348.449 2.0065 362.165 2.68914C377.77 3.46579 398.704 3.9752 432.339 3.7377C446.939 3.63461 456.52 3.26772 461.56 3.77749C477.676 5.4077 467.469 42.6721 468.521 56.1129C468.725 58.7105 468.956 59.7561 463.073 61.1662C457.19 62.5763 445.226 64.3172 379.373 66.7259C313.52 69.1345 194.14 67.0725 131.795 68.706C69.4492 70.3396 67.7552 70.4914 57.754 70.6188C29.4984 70.9788 8.36514 70.5919 4.62685 69.5315C1.83233 68.7388 2.28859 48.4142 2.19359 19.5717C2.11682 9.01336 1.98202 6.73501 1.78872 5.03823C1.59542 3.34144 1.3477 2.29526 0.750244 0.848555"
+          stroke="#262626" stroke-width="1.5" stroke-linecap="round" />
+      </svg>
+    </template>
+
+    <template id="tpl-pill">
+      <svg class="hd-svg" viewBox="0 0 123 46" preserveAspectRatio="none" fill="none"
+        xmlns="http://www.w3.org/2000/svg">
+        <path
+          d="M76.3722 4.90906C86.0656 4.84068 86.0939 4.84068 86.1223 4.84068C87.9582 4.82807 89.3636 4.65661 91.4275 4.8186C94.7849 5.08212 95.7064 5.2108 101.498 6.31873C104.742 7.21975 108.248 8.70459 113.247 11.3187C115.947 12.7311 117.285 14.1243 118.135 15.2652C120.002 17.772 122.198 20.2085 122.198 25.3187C122.198 29.8187 121.201 33.0625 118.135 36.8187C115.285 40.3092 111.674 41.9234 107.652 42.705C106.409 42.9465 99.6189 44.8187 90.868 44.8187C86.6817 44.8187 73.4627 44.4108 59.5376 44.8187C45.6125 45.2265 31.3812 45.1982 21.4941 44.8187C15.1297 44.5744 10.5635 42.4463 5.82952 38.8187C1.67489 35.635 1.12034 29.4479 1.27157 27.1829C1.52569 23.3769 1.7734 16.6785 5.09916 13.2956C7.72893 10.6206 10.5608 8.15079 16.2143 7.08123C18.9684 6.56019 23.1727 5.90764 35.2469 5.51092C47.3212 5.11419 66.6788 4.97743 76.3722 4.90906Z"
+          fill="#262626" />
+        <path class="pill-fill-path"
+          d="M75.8722 0.909056C85.5656 0.840677 85.5939 0.840677 85.6223 0.840677C87.4582 0.828066 88.8636 0.656609 90.9275 0.818604C94.2849 1.08212 95.2064 1.2108 100.998 2.31873C104.242 3.21975 107.748 4.70459 112.747 7.31873C115.447 8.7311 116.785 10.1243 117.635 11.2652C119.502 13.772 121.698 16.2085 121.698 21.3187C121.698 25.8187 120.701 29.0625 117.635 32.8187C114.785 36.3092 111.174 37.9234 107.152 38.705C105.909 38.9465 99.1189 40.8187 90.368 40.8187C86.1817 40.8187 72.9627 40.4108 59.0376 40.8187C45.1125 41.2265 30.8812 41.1982 20.9941 40.8187C14.6297 40.5744 10.0635 38.4463 5.32952 34.8187C1.17489 31.635 0.620345 25.4479 0.771571 23.1829C1.02569 19.3769 1.2734 12.6785 4.59916 9.2956C7.22893 6.62063 10.0608 4.15079 15.7143 3.08123C18.4684 2.56019 22.6727 1.90764 34.7469 1.51092C46.8212 1.11419 66.1788 0.977434 75.8722 0.909056Z"
+          fill="#FAFAFA" stroke="#262626" stroke-width="1.5" stroke-linecap="round" />
+      </svg>
+    </template>
+
+    <!-- ══════════════════════════════════════════════════
+       SETUP SCREEN
+  ══════════════════════════════════════════════════ -->
+    <div class="screen" id="setup-screen">
+
+      <p class="desktop-hint"><svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="7.5" cy="7.5" r="6.5" stroke="#8a7e78" stroke-width="1.4"/><line x1="7.5" y1="6.5" x2="7.5" y2="11" stroke="#8a7e78" stroke-width="1.4" stroke-linecap="round"/><circle cx="7.5" cy="4.5" r="0.9" fill="#8a7e78"/></svg>Best experienced on desktop</p>
+
+      <div class="field-group">
+        <label class="field-label">What should I call you?</label>
+        <div class="hd-shell" id="name-shell">
+          <div class="hd-content name-content">
+            <input id="name-input" type="text" placeholder="Arch" maxlength="40" autocomplete="off" />
+          </div>
+        </div>
+        <p class="field-msg" id="name-msg"></p>
+      </div>
+
+      <div class="field-group" id="work-field-group">
+        <label class="field-label">Work duration</label>
+        <div class="hd-shell" id="work-shell">
+          <div class="hd-content stepper-content">
+            <button class="stepper-btn" id="work-minus">−</button>
+            <div class="stepper-value" id="work-val">
+              <span id="work-display"></span>
+              <input type="text" id="work-input" inputmode="numeric" maxlength="2" style="display:none;" />
+            </div>
+            <button class="stepper-btn" id="work-plus">+</button>
+          </div>
+        </div>
+        <p class="field-msg" id="work-msg"></p>
+        <div class="presets" id="work-presets">
+          <div class="pill-shell" id="wp0"><button class="preset-btn" data-mins="25">25 mins</button></div>
+          <div class="pill-shell" id="wp1"><button class="preset-btn" data-mins="45">45 mins</button></div>
+          <div class="pill-shell" id="wp2"><button class="preset-btn" data-mins="60">60 mins</button></div>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label">Break duration</label>
+        <div class="hd-shell" id="break-shell">
+          <div class="hd-content stepper-content">
+            <button class="stepper-btn" id="break-minus">−</button>
+            <div class="stepper-value" id="break-val">
+              <span id="break-display"></span>
+              <input type="text" id="break-input" inputmode="numeric" maxlength="2" style="display:none;" />
+            </div>
+            <button class="stepper-btn" id="break-plus">+</button>
+          </div>
+        </div>
+        <p class="field-msg" id="break-msg"></p>
+      </div>
+
+      <div class="start-wrap">
+        <button class="start-btn" id="start-btn">Start session</button>
+      </div>
+
+    </div>
+
+    <!-- ══════════════════════════════════════════════════
+  <!-- ══════════════════════════════════════════════════
+       TIMER SCREEN
+  ══════════════════════════════════════════════════ -->
+    <div class="screen hidden" id="timer-screen">
+
+      <!-- Back button — top-left, matches screenshot exactly -->
+      <div class="timer-back-row">
+        <button class="timer-back-btn" id="back-btn">
+          <svg width="22" height="21" viewBox="0 0 25 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M2.86621 12.0978C5.20472 12.1121 7.21072 11.1604 10.5905 11.644C15.1641 11.5502 12.4661 12.133 16.3844 11.644C18.9329 11.558 17.5639 11.8667 22.3384 11.7884"
+              stroke="#262626" stroke-width="3.5" stroke-linecap="round" />
+            <path
+              d="M9.09851 2.8916C7.511 4.80311 3.81342 9.37905 2.04088 11.8129C1.61091 12.4032 1.64927 13.2259 2.19919 13.7066C3.27394 14.6459 3.31188 13.8952 4.98994 16.1303C5.36866 16.7768 9.60269 20.4167 10.0115 21.6084"
+              stroke="#262626" stroke-width="3.5" stroke-linecap="round" />
+          </svg>
+          Back
+        </button>
+      </div>
+
+      <div class="timer-screen-inner">
+        <!-- Clock SVG -->
+        <svg class="clock-svg" id="clock-svg" viewBox="0 0 552 532" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path
+            d="M488.113 264.5C488.113 311.783 480.6 363.128 452.113 397.5C413.554 444.026 344.474 466 277.613 466C161.357 466 67.1133 375.785 67.1133 264.5C67.1133 153.215 161.357 63 277.613 63C393.869 63 488.113 153.215 488.113 264.5Z"
+            fill="#FAFAFA" />
+          <!-- Filled pie-sector — JS writes the 'd' attribute each tick -->
+          <path id="timer-segment" fill="#FFD4A6" d="" />
+          <path
+            d="M286.035 471.997C320.844 473.253 354.438 464.521 384.672 451.576C407.078 441.983 427.64 432.005 445.484 411.953C467.457 388.213 479.6 363.93 487.982 327.623C491.524 312.282 491.135 301.867 491.392 291.157C491.743 276.519 491.443 261.329 486.971 232.26C485.847 224.95 484.472 217.702 482.66 210.642C460.23 121.732 391.501 69.3738 301.217 64.4379C300.678 64.3731 300.132 64.3731 299.593 64.4379C206.372 53.6288 112.714 104.488 76.9131 192.523C50.6286 257.097 59.6304 332.771 101.722 388.504C112.86 403.252 109.21 404.016 139.893 427.731C183.616 455.139 234.449 473.327 286.035 471.997ZM76.3829 223.325C101.375 125.544 201.999 60.6511 300.468 72.7098C301.292 72.8781 302.142 72.8781 302.967 72.7098C379.505 77.2084 441.656 121.357 469.397 193.335C492.703 253.816 489.751 341.932 449.763 393.853C411.588 443.837 338.643 463.655 276.725 462.53H273.476C273.476 462.53 273.039 462.53 272.789 462.53C245.278 461.56 218.085 456.311 192.189 446.973C100.656 413.671 52.2655 317.171 76.3829 223.325Z"
+            fill="#2C2C2C" />
+          <path
+            d="M276.838 90.7949C276.821 90.7949 276.469 90.7981 275.858 90.8589C275.38 90.9066 274.264 92.1299 273.463 93.1443C272.398 94.4911 271.735 95.995 271.423 97.0388C271.049 98.2939 271.058 99.6403 271.125 100.8C271.23 102.624 271.716 103.64 272.971 105.261C274.494 107.228 276.979 107.377 276.979 107.377C276.979 107.377 280.198 107.772 281.817 106.77C283.462 105.753 284.217 104.604 284.8 102.761C285.326 101.097 285.545 99.8526 285.471 98.2607C285.371 96.1085 284.221 94.8144 282.828 93.3162C281.553 91.9438 280.429 91.4429 278.596 91.0558C278.333 91.0004 278.219 90.9625 277.918 90.9408C277.618 90.9191 276.755 90.955 276.457 91.0016"
+            stroke="#2C2C2C" stroke-width="2.7" stroke-linecap="round" />
+          <path
+            d="M248.228 493.783C286.583 501.575 325.423 498.089 361.313 489.324C387.91 482.829 412.533 475.569 435.995 456.661C464.709 434.43 482.627 409.791 498.584 371.155C505.327 354.83 506.808 343.233 509.06 331.428C512.136 315.294 514.593 298.429 514.973 265.438C515.068 257.142 514.875 248.869 514.163 240.723C505.623 138.209 439.054 67.6285 339.884 45.5629C339.298 45.392 338.694 45.2917 338.084 45.2642C236.737 16.1592 123.584 55.2168 67.7373 146.054C26.7463 212.68 22.8308 298.078 59.2555 367.493C68.8937 385.861 64.7075 386.036 94.3644 417.921C137.797 456.293 190.804 485.768 248.228 493.783ZM61.4943 180.043C107.149 76.4323 230.6 23.1259 337.535 54.5789C338.418 54.9168 339.36 55.0731 340.305 55.0385C424.318 74.0923 485.104 134.378 502.639 219.131C517.368 290.346 497.918 387.315 444.061 437.418C392.569 485.711 308.074 494.227 239.647 481.595L236.046 480.998C236.046 480.998 235.561 480.917 235.284 480.871C204.967 474.738 175.79 463.929 148.799 448.833C53.4526 395.147 17.5314 279.459 61.4943 180.043Z"
+            fill="#2C2C2C" />
+          <path
+            d="M369.106 133.679C369.191 135.345 368.609 136.925 367.465 138.131C366.337 139.319 364.751 140 363.113 140H358.613C357.784 140 357.113 139.329 357.113 138.5C357.113 137.67 357.784 137 358.613 137H363.113C363.944 137 364.715 136.667 365.288 136.065C365.861 135.462 366.152 134.672 366.109 133.836C366.026 132.273 364.57 131 362.858 131H358.613C357.784 131 357.113 130.329 357.113 129.5V125C357.113 123.345 358.459 122 360.113 122H366.113C366.943 122 367.613 122.67 367.613 123.5C367.613 124.329 366.943 125 366.113 125H360.113V128H362.858C366.194 128 368.939 130.495 369.106 133.679Z"
+            fill="#2C2C2C" />
+          <path
+            d="M200.106 133.679C200.191 135.345 199.609 136.925 198.465 138.131C197.337 139.319 195.751 140 194.113 140H189.613C188.784 140 188.113 139.329 188.113 138.5C188.113 137.67 188.784 137 189.613 137H194.113C194.944 137 195.715 136.667 196.288 136.065C196.861 135.462 197.152 134.672 197.109 133.836C197.026 132.273 195.57 131 193.858 131H189.613C188.784 131 188.113 130.329 188.113 129.5V125C188.113 123.345 189.459 122 191.113 122H197.113C197.943 122 198.613 122.67 198.613 123.5C198.613 124.329 197.943 125 197.113 125H191.113V128H193.858C197.194 128 199.939 130.495 200.106 133.679Z"
+            fill="#2C2C2C" />
+          <path
+            d="M383.106 133.679C383.191 135.345 382.609 136.925 381.465 138.131C380.337 139.319 378.751 140 377.113 140H372.613C371.784 140 371.113 139.329 371.113 138.5C371.113 137.67 371.784 137 372.613 137H377.113C377.944 137 378.715 136.667 379.288 136.065C379.861 135.462 380.152 134.672 380.109 133.836C380.026 132.273 378.57 131 376.858 131H372.613C371.784 131 371.113 130.329 371.113 129.5V125C371.113 123.345 372.459 122 374.113 122H380.113C380.943 122 381.613 122.67 381.613 123.5C381.613 124.329 380.943 125 380.113 125H374.113V128H376.858C380.194 128 382.939 130.495 383.106 133.679Z"
+            fill="#2C2C2C" />
+          <path
+            d="M421.106 193.679C421.191 195.345 420.609 196.925 419.465 198.131C418.337 199.319 416.751 200 415.113 200H410.613C409.784 200 409.113 199.329 409.113 198.5C409.113 197.67 409.784 197 410.613 197H415.113C415.944 197 416.715 196.667 417.288 196.065C417.861 195.462 418.152 194.672 418.109 193.836C418.026 192.273 416.57 191 414.858 191H410.613C409.784 191 409.113 190.329 409.113 189.5V185C409.113 183.345 410.459 182 412.113 182H418.113C418.943 182 419.613 182.67 419.613 183.5C419.613 184.329 418.943 185 418.113 185H412.113V188H414.858C418.194 188 420.939 190.495 421.106 193.679Z"
+            fill="#2C2C2C" />
+          <path
+            d="M431.666 182.671C431.649 182.671 431.297 182.674 430.686 182.735C430.207 182.783 429.092 184.006 428.29 185.02C427.225 186.367 426.562 187.871 426.25 188.915C425.876 190.17 425.885 191.516 425.952 192.676C426.058 194.5 426.543 195.516 427.798 197.137C429.321 199.104 431.806 199.253 431.806 199.253C431.806 199.253 435.025 199.648 436.644 198.646C438.289 197.629 439.044 196.48 439.627 194.637C440.153 192.973 440.372 191.729 440.298 190.137C440.198 187.985 439.048 186.69 437.655 185.192C436.38 183.82 435.257 183.319 433.423 182.932C433.161 182.876 433.047 182.838 432.746 182.817C432.445 182.795 431.582 182.831 431.284 182.878"
+            stroke="#2C2C2C" stroke-width="2.7" stroke-linecap="round" />
+          <path
+            d="M456.439 270.679C456.524 272.345 455.942 273.925 454.798 275.131C453.67 276.319 452.084 277 450.446 277H445.946C445.117 277 444.446 276.329 444.446 275.5C444.446 274.67 445.117 274 445.946 274H450.446C451.277 274 452.048 273.667 452.621 273.065C453.194 272.462 453.485 271.672 453.442 270.836C453.359 269.273 451.903 268 450.191 268H445.946C445.117 268 444.446 267.329 444.446 266.5V262C444.446 260.345 445.792 259 447.446 259H453.446C454.276 259 454.946 259.67 454.946 260.5C454.946 261.329 454.276 262 453.446 262H447.446V265H450.191C453.527 265 456.272 267.495 456.439 270.679Z"
+            fill="#2C2C2C" />
+          <path
+            d="M440.613 275.562V261.187C440.613 260.393 439.971 259.75 439.176 259.75C438.381 259.75 437.738 260.393 437.738 261.187V268.375H433.426C432.632 268.375 431.988 267.731 431.988 266.937V261.187C431.988 260.393 431.346 259.75 430.551 259.75C429.756 259.75 429.113 260.393 429.113 261.187V266.937C429.113 269.315 431.048 271.25 433.426 271.25H437.738V275.562C437.738 276.357 438.381 277 439.176 277C439.971 277 440.613 276.357 440.613 275.562Z"
+            fill="#2C2C2C" />
+          <path
+            d="M433.468 347.795C433.451 347.795 433.099 347.798 432.488 347.859C432.01 347.907 430.894 349.13 430.092 350.144C429.028 351.491 428.365 352.995 428.053 354.039C427.678 355.294 427.688 356.64 427.755 357.8C427.86 359.624 428.346 360.64 429.601 362.261C431.124 364.228 433.609 364.377 433.609 364.377C433.609 364.377 436.828 364.772 438.447 363.77C440.092 362.753 440.846 361.604 441.43 359.761C441.956 358.097 442.175 356.853 442.101 355.261C442 353.109 440.851 351.814 439.458 350.316C438.182 348.944 437.059 348.443 435.226 348.056C434.963 348 434.849 347.962 434.548 347.941C434.247 347.919 433.385 347.955 433.087 348.002"
+            stroke="#2C2C2C" stroke-width="2.7" stroke-linecap="round" />
+          <path
+            d="M422.613 362.812V348.437C422.613 347.643 421.971 347 421.176 347C420.381 347 419.738 347.643 419.738 348.437V355.625H415.426C414.632 355.625 413.988 354.981 413.988 354.187V348.437C413.988 347.643 413.346 347 412.551 347C411.756 347 411.113 347.643 411.113 348.437V354.187C411.113 356.565 413.048 358.5 415.426 358.5H419.738V362.812C419.738 363.607 420.381 364.25 421.176 364.25C421.971 364.25 422.613 363.607 422.613 362.812Z"
+            fill="#2C2C2C" />
+          <path
+            d="M373.273 409.679C373.358 411.345 372.776 412.925 371.632 414.131C370.504 415.319 368.918 416 367.28 416H362.78C361.951 416 361.28 415.329 361.28 414.5C361.28 413.67 361.951 413 362.78 413H367.28C368.111 413 368.882 412.667 369.455 412.065C370.028 411.462 370.319 410.672 370.276 409.836C370.193 408.273 368.737 407 367.025 407H362.78C361.951 407 361.28 406.329 361.28 405.5V401C361.28 399.345 362.626 398 364.28 398H370.28C371.11 398 371.78 398.67 371.78 399.5C371.78 400.329 371.11 401 370.28 401H364.28V404H367.025C370.361 404 373.106 406.495 373.273 409.679Z"
+            fill="#2C2C2C" />
+          <path
+            d="M352.113 416C355.422 416 358.113 413.309 358.113 410C358.113 408.035 357.15 406.302 355.685 405.207C356.259 404.451 356.613 403.52 356.613 402.5C356.613 400.019 354.594 398 352.113 398H347.613C346.785 398 346.113 398.67 346.113 399.5C346.113 400.329 346.785 401 347.613 401H352.113C352.94 401 353.613 401.672 353.613 402.5C353.613 403.328 352.94 404 352.113 404H349.113C348.285 404 347.613 404.67 347.613 405.5C347.613 406.329 348.285 407 349.113 407H352.113C353.768 407 355.113 408.345 355.113 410C355.113 411.654 353.768 413 352.113 413H347.613C346.785 413 346.113 413.67 346.113 414.5C346.113 415.329 346.785 416 347.613 416H352.113Z"
+            fill="#2C2C2C" />
+          <path
+            d="M284.468 422.795C284.451 422.795 284.099 422.798 283.488 422.859C283.01 422.907 281.894 424.13 281.092 425.144C280.028 426.491 279.365 427.995 279.053 429.039C278.678 430.294 278.688 431.64 278.755 432.8C278.86 434.624 279.346 435.64 280.601 437.261C282.124 439.228 284.609 439.377 284.609 439.377C284.609 439.377 287.828 439.772 289.447 438.77C291.092 437.753 291.846 436.604 292.43 434.761C292.956 433.097 293.175 431.853 293.101 430.261C293 428.109 291.851 426.814 290.458 425.316C289.182 423.944 288.059 423.443 286.226 423.056C285.963 423 285.849 422.962 285.548 422.941C285.247 422.919 284.385 422.955 284.087 423.002"
+            stroke="#2C2C2C" stroke-width="2.7" stroke-linecap="round" />
+          <path
+            d="M269.113 440C272.422 440 275.113 437.309 275.113 434C275.113 432.035 274.15 430.302 272.685 429.207C273.259 428.451 273.613 427.52 273.613 426.5C273.613 424.019 271.594 422 269.113 422H264.613C263.785 422 263.113 422.67 263.113 423.5C263.113 424.329 263.785 425 264.613 425H269.113C269.94 425 270.613 425.672 270.613 426.5C270.613 427.328 269.94 428 269.113 428H266.113C265.285 428 264.613 428.67 264.613 429.5C264.613 430.329 265.285 431 266.113 431H269.113C270.768 431 272.113 432.345 272.113 434C272.113 435.654 270.768 437 269.113 437H264.613C263.785 437 263.113 437.67 263.113 438.5C263.113 439.329 263.785 440 264.613 440H269.113Z"
+            fill="#2C2C2C" />
+          <path
+            d="M205.106 410.679C205.191 412.345 204.609 413.925 203.465 415.131C202.337 416.319 200.751 417 199.113 417H194.613C193.784 417 193.113 416.329 193.113 415.5C193.113 414.67 193.784 414 194.613 414H199.113C199.944 414 200.715 413.667 201.288 413.065C201.861 412.462 202.152 411.672 202.109 410.836C202.026 409.273 200.57 408 198.858 408H194.613C193.784 408 193.113 407.329 193.113 406.5V402C193.113 400.345 194.459 399 196.113 399H202.113C202.943 399 203.613 399.67 203.613 400.5C203.613 401.329 202.943 402 202.113 402H196.113V405H198.858C202.194 405 204.939 407.495 205.106 410.679Z"
+            fill="#2C2C2C" />
+          <path
+            d="M192.283 415.731C192.283 414.889 191.602 414.21 190.762 414.21H183.491C184.139 413.647 185.117 413.115 186.14 412.558C188.808 411.104 192.461 409.113 192.277 404.754C192.142 401.528 189.473 399 186.201 399C182.846 399 180.117 401.729 180.117 405.084C180.117 405.925 180.799 406.605 181.638 406.605C182.478 406.605 183.159 405.925 183.159 405.084C183.159 403.406 184.523 402.042 186.201 402.042C187.81 402.042 189.173 403.316 189.238 404.882C189.336 407.183 187.584 408.308 184.685 409.886C183.179 410.707 181.757 411.481 180.792 412.619C180.07 413.47 179.91 414.625 180.379 415.635C180.841 416.631 181.812 417.25 182.913 417.25H190.764C191.603 417.25 192.285 416.57 192.285 415.729L192.283 415.731Z"
+            fill="#2C2C2C" />
+          <path
+            d="M144.481 347.534C144.464 347.534 144.112 347.537 143.501 347.598C143.022 347.646 141.907 348.869 141.105 349.884C140.04 351.23 139.377 352.734 139.066 353.778C138.691 355.033 138.7 356.38 138.767 357.539C138.873 359.364 139.359 360.38 140.613 362C142.136 363.967 144.622 364.116 144.622 364.116C144.622 364.116 147.841 364.512 149.46 363.51C151.104 362.492 151.859 361.344 152.443 359.5C152.969 357.837 153.187 356.592 153.113 355C153.013 352.848 151.864 351.554 150.471 350.055C149.195 348.683 148.072 348.182 146.239 347.795C145.976 347.74 145.862 347.702 145.561 347.68C145.26 347.658 144.397 347.694 144.099 347.741"
+            stroke="#2C2C2C" stroke-width="2.7" stroke-linecap="round" />
+          <path
+            d="M136.283 363.731C136.283 362.889 135.602 362.21 134.762 362.21H127.491C128.139 361.647 129.117 361.115 130.14 360.558C132.808 359.104 136.461 357.113 136.277 352.754C136.142 349.528 133.473 347 130.201 347C126.846 347 124.117 349.729 124.117 353.084C124.117 353.925 124.799 354.605 125.638 354.605C126.478 354.605 127.159 353.925 127.159 353.084C127.159 351.406 128.523 350.042 130.201 350.042C131.81 350.042 133.173 351.316 133.238 352.882C133.336 355.183 131.584 356.308 128.685 357.886C127.179 358.707 125.757 359.481 124.792 360.619C124.07 361.47 123.91 362.625 124.379 363.635C124.841 364.631 125.812 365.25 126.913 365.25H134.764C135.603 365.25 136.285 364.57 136.285 363.729L136.283 363.731Z"
+            fill="#2C2C2C" />
+          <path
+            d="M120.106 270.679C120.191 272.345 119.609 273.925 118.465 275.131C117.337 276.319 115.751 277 114.113 277H109.613C108.784 277 108.113 276.329 108.113 275.5C108.113 274.67 108.784 274 109.613 274H114.113C114.944 274 115.715 273.667 116.288 273.065C116.861 272.462 117.152 271.672 117.109 270.836C117.026 269.273 115.57 268 113.858 268H109.613C108.784 268 108.113 267.329 108.113 266.5V262C108.113 260.345 109.459 259 111.113 259H117.113C117.943 259 118.613 259.67 118.613 260.5C118.613 261.329 117.943 262 117.113 262H111.113V265H113.858C117.194 265 119.939 267.495 120.106 270.679Z"
+            fill="#2C2C2C" />
+          <path
+            d="M104.779 260.501V275.5C104.779 276.33 104.107 277 103.279 277C102.451 277 101.779 276.33 101.779 275.5V264.122L100.674 265.228C100.087 265.814 99.1396 265.814 98.5531 265.228C97.9667 264.641 97.9667 263.693 98.5531 263.107L102.219 259.441C102.646 259.012 103.291 258.88 103.854 259.116C104.413 259.347 104.779 259.896 104.779 260.501Z"
+            fill="#2C2C2C" />
+          <path
+            d="M139.666 182.671C139.649 182.671 139.297 182.674 138.686 182.735C138.207 182.783 137.092 184.006 136.29 185.02C135.225 186.367 134.562 187.871 134.25 188.915C133.876 190.17 133.885 191.516 133.952 192.676C134.058 194.5 134.543 195.516 135.798 197.137C137.321 199.104 139.806 199.253 139.806 199.253C139.806 199.253 143.025 199.648 144.644 198.646C146.289 197.629 147.044 196.48 147.627 194.637C148.153 192.973 148.372 191.729 148.298 190.137C148.198 187.985 147.048 186.69 145.655 185.192C144.38 183.82 143.257 183.319 141.423 182.932C141.161 182.876 141.047 182.838 140.746 182.817C140.445 182.795 139.582 182.831 139.284 182.878"
+            stroke="#2C2C2C" stroke-width="2.7" stroke-linecap="round" />
+          <path
+            d="M129.779 183.501V198.5C129.779 199.33 129.107 200 128.279 200C127.451 200 126.779 199.33 126.779 198.5V187.122L125.674 188.228C125.087 188.814 124.14 188.814 123.553 188.228C122.967 187.641 122.967 186.693 123.553 186.107L127.219 182.441C127.646 182.012 128.291 181.88 128.854 182.116C129.413 182.347 129.779 182.896 129.779 183.501Z"
+            fill="#2C2C2C" />
+          <path d="M279.737 111.556V120.31" stroke="#2C2C2C" stroke-width="3" stroke-linecap="round" />
+          <path d="M299.662 121.565C299.662 121.533 300.02 116.235 300.113 113.596" stroke="#2C2C2C" stroke-width="2"
+            stroke-linecap="round" />
+          <path
+            d="M315.303 125.374C315.303 125.342 315.661 124.666 316.463 123.297C316.908 122.586 317.428 121.844 317.8 121.21C318.172 120.576 318.379 120.073 319.053 118.812"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M328.1 131.371C328.1 131.325 328.101 130.946 328.194 130.211C328.47 129.436 329.774 127.785 331.585 125.779C332.281 125.016 332.526 124.771 333.128 124.046"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M340.876 139.407C340.876 139.395 340.876 139.384 342.03 137.997C343.184 136.611 345.492 133.85 348.086 130.651"
+            stroke="#2C2C2C" stroke-width="3" stroke-linecap="round" />
+          <path d="M383.113 195H396.259" stroke="#2C2C2C" stroke-width="4" stroke-linecap="round" />
+          <path
+            d="M404.548 270.098C404.585 270.098 404.622 270.098 406.738 270.098C408.853 270.098 413.046 270.098 415.455 270.142C417.865 270.186 418.364 270.274 418.878 270.366"
+            stroke="#2C2C2C" stroke-width="4" stroke-linecap="round" />
+          <path
+            d="M394.215 336.266C394.285 337.01 397.428 341.884 399.769 345.836C400.473 346.622 401.303 347.482 402.236 348.473C403.169 349.464 404.18 350.56 406.091 352.075"
+            stroke="#2C2C2C" stroke-width="4" stroke-linecap="round" />
+          <path
+            d="M346.582 375.243C346.612 375.3 346.642 375.357 347.851 377.684C349.06 380.012 351.446 384.608 353.904 389.343"
+            stroke="#2C2C2C" stroke-width="4" stroke-linecap="round" />
+          <path
+            d="M276.272 393.293C276.272 393.358 276.272 393.422 276.247 396.045C276.222 398.667 276.172 403.845 276.12 409.18"
+            stroke="#2C2C2C" stroke-width="4" stroke-linecap="round" />
+          <path
+            d="M163.185 354.954C163.173 354.933 163.161 354.913 164.804 353.93C166.447 352.947 169.745 351.003 173.142 349"
+            stroke="#2C2C2C" stroke-width="4" stroke-linecap="round" />
+          <path
+            d="M219.036 389.175C218.998 389.227 218.96 389.279 217.395 391.383C215.83 393.488 212.74 397.643 209.556 401.924"
+            stroke="#2C2C2C" stroke-width="4" stroke-linecap="round" />
+          <path
+            d="M131.072 271.716C131.072 271.739 131.072 271.761 134.518 271.785C137.963 271.808 144.853 271.831 151.953 271.854"
+            stroke="#2C2C2C" stroke-width="4" stroke-linecap="round" />
+          <path d="M161.134 191.986L170.607 195.719" stroke="#2C2C2C" stroke-width="4" stroke-linecap="round" />
+          <path d="M205.113 144L210.148 152.851" stroke="#2C2C2C" stroke-width="4" stroke-linecap="round" />
+          <path
+            d="M357.8 149.537C357.942 149.465 357.649 149.746 356.805 150.423C356.327 150.782 355.749 151.173 355.161 151.535C354.574 151.896 353.996 152.216 352.305 153.191"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M364.113 163.4C364.184 163.4 364.65 162.766 365.769 162.5C366.334 162.316 366.767 162.254 367.269 162C367.77 161.746 368.183 161.333 369.269 161"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M372.113 172.977C372.184 172.977 372.726 172.877 373.703 172.611C374.175 172.446 374.597 172.219 375.099 171.976C375.602 171.733 376.171 171.48 377.62 171"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M378.23 183.747C378.301 183.737 379.167 183.53 380.661 183.13C381.324 182.933 381.796 182.746 382.3 182.594C382.805 182.442 383.329 182.331 384.601 182"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M390.113 211C390.204 211 390.699 210.886 392.113 211C392.803 211.068 393.313 210.931 394.113 211C394.913 211.069 397.137 211.34 398.113 211.386"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M395.113 225.948C395.204 225.948 395.846 226.122 397.113 226C397.761 225.924 398.966 226.082 399.613 225.948C400.26 225.813 400.473 225.948 402.613 225.78"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M400.113 242.266C400.158 242.266 400.204 242.266 401.061 242.08C401.918 241.894 403.585 241.522 404.754 241.331C405.922 241.139 406.541 241.139 407.728 241"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M402.925 256.625C403.098 256.625 403.272 256.625 404.592 256.467C405.912 256.309 408.374 255.992 410.208 255.829C412.043 255.666 413.176 255.666 414.344 255.666"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M408.428 287.847C408.473 287.847 408.518 287.847 409.172 287.869C409.826 287.892 411.088 287.937 412.031 288.05C412.975 288.164 413.562 288.344 415.946 288.667"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M409.185 303.812C409.275 303.812 410.588 303.96 413.043 304.184C414.232 304.26 415.303 304.26 416.148 304.419C416.994 304.577 417.582 304.893 418.325 305.356"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M406.048 316.599C406.138 316.689 406.887 317.057 408.411 317.749C409.234 318.121 410.155 318.533 411.013 318.971C411.871 319.409 412.639 319.86 413.976 320.462"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M403.247 327.474C403.247 327.564 403.701 328.247 404.75 329.55C405.345 330.216 406.069 330.895 406.645 331.47C407.221 332.045 407.627 332.496 408.046 333.097"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M159.034 333.71C158.995 333.733 158.956 333.755 158.378 334.063C157.801 334.37 156.686 334.962 155.812 335.335C154.938 335.709 154.339 335.846 152.113 336.759"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M151.801 318.337C151.723 318.382 150.511 318.911 148.273 319.944C147.206 320.473 146.278 321.008 145.467 321.294C144.655 321.58 143.988 321.6 143.113 321.57"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M145.911 302.346C145.788 302.313 144.956 302.369 143.289 302.531C142.391 302.62 141.387 302.724 140.425 302.774C139.463 302.823 138.573 302.817 137.113 302.965"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M141.447 287.937C141.385 287.871 140.587 287.684 138.93 287.454C138.04 287.376 137.048 287.378 136.234 287.354C135.421 287.33 134.816 287.279 134.099 287.128"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M359.812 370.05C359.857 370.095 359.902 370.14 360.222 370.586C360.542 371.031 361.137 371.876 361.675 372.738C362.212 373.599 362.676 374.453 363.154 375.605"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M369.359 364.141C369.45 364.231 370.064 365.039 371.128 366.442C371.623 367.083 372.03 367.582 372.42 368.109C372.81 368.637 373.171 369.178 374.363 370.966"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M378.434 357.16C378.524 357.16 379.341 357.653 380.781 358.581C381.45 359.015 381.993 359.376 382.476 359.811C382.959 360.245 383.365 360.742 384.604 362.758"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M387.225 350.36C387.315 350.451 387.405 350.541 387.729 351.06C388.053 351.58 388.609 352.525 389.053 353.284C389.497 354.042 389.814 354.584 391.234 356.373"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M294.948 392.508C294.948 392.598 295.084 393.506 295.379 395.106C295.719 396.432 296.086 397.624 296.449 398.806C296.632 399.401 296.813 399.988 297.685 402.232"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M305.613 391.099C305.704 391.189 306.123 392.317 306.779 394.251C307.062 395.103 307.242 395.691 307.425 396.288C307.609 396.884 307.789 397.471 308.387 398.212"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M319.934 387.13C319.934 387.084 319.934 387.038 320.117 387.656C320.3 388.274 320.666 389.557 320.974 390.622C321.282 391.688 321.52 392.496 322.312 394.832"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M331.179 383.622C331.269 383.622 331.553 384.422 332.058 386.16C332.325 387.097 332.614 388.146 333.013 389.219C333.413 390.292 333.914 391.356 334.568 392.727"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M228.038 400.412C228.038 400.321 228.537 399.585 229.518 398.267C230.001 397.637 230.453 397.086 230.888 396.573C231.324 396.06 231.73 395.601 232.149 394.989"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M241.267 403.643C241.267 403.609 241.267 403.575 241.283 403.272C241.3 402.97 241.333 402.4 241.401 401.818C241.468 401.237 241.568 400.66 241.873 398.832"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M252.005 405.408C252.005 405.34 252.005 405.273 252.038 405C252.072 404.728 252.138 404.253 252.173 403.455C252.207 402.658 252.207 401.552 252.308 399.693"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M263.909 406.584C263.909 406.55 263.909 406.516 263.892 405.498C263.875 404.48 263.841 402.478 263.703 400.313"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M177.405 361C177.376 361.057 177.347 361.113 177.02 361.554C176.693 361.995 176.069 362.818 175.412 363.592C174.754 364.367 174.083 365.068 173.13 365.874"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M186.405 370C186.376 370.057 186.347 370.113 186.02 370.554C185.693 370.995 185.069 371.818 184.412 372.592C183.754 373.367 183.083 374.068 182.13 374.874"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M194.405 378C194.376 378.057 194.347 378.113 194.02 378.554C193.693 378.995 193.069 379.818 192.412 380.592C191.754 381.367 191.083 382.068 190.13 382.874"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M205.922 386.341C205.893 386.398 205.863 386.454 205.536 386.895C205.209 387.336 204.586 388.159 203.928 388.933C203.271 389.708 202.599 390.409 201.647 391.215"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M149.191 206.427C149.276 206.45 150.036 206.521 151.451 206.655C152.151 206.73 152.813 206.82 154.118 207.11C155.423 207.4 157.351 207.886 159.337 208.387"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M143.172 221.825C143.258 221.844 144.052 222.118 145.549 222.597C146.296 222.811 147.016 222.967 148.154 223.242C149.292 223.516 150.824 223.905 152.403 224.306"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M138.897 236.616C138.888 236.659 138.878 236.702 139.206 236.898C139.534 237.094 140.201 237.442 141.618 237.87C143.035 238.298 145.182 238.797 147.393 239.31"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M135.508 253.844C135.517 253.8 135.526 253.756 136.934 254C138.342 254.245 141.149 254.778 144.041 255.328"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M168.113 180.028C168.157 179.983 168.201 179.939 169.048 180.346C169.895 180.754 171.544 181.616 172.636 182.28C173.727 182.945 174.213 183.386 175.649 184.909"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M178.119 171C178.106 170.957 178.094 170.914 178.847 171.641C179.6 172.369 181.119 173.868 183.251 175.944"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M186.113 162C186.201 162.044 186.289 162.088 186.691 162.523C187.093 162.958 187.806 163.783 188.394 164.428C188.982 165.074 189.424 165.515 190.948 167.303"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M194.726 153.258C194.829 153.378 194.933 153.498 195.32 154.066C195.708 154.635 196.376 155.648 196.925 156.388C197.474 157.129 197.884 157.566 199.264 159.241"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M219.113 135C219.113 135.088 219.596 135.73 220.746 137.099C221.414 137.872 222.253 138.803 222.874 139.567C223.495 140.331 223.872 140.898 224.927 142.818"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M231.113 129C231.289 129 231.776 129.574 232.587 130.682C233.002 131.217 233.424 131.695 233.817 132.185C234.21 132.675 234.562 133.161 235.325 134.195"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M243.113 124C243.201 124.088 243.289 124.176 243.751 124.587C244.213 124.999 245.046 125.731 245.652 126.351C246.258 126.972 246.611 127.459 247.911 129.432"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M258.704 118C258.747 118.011 258.789 118.022 259.091 118.536C259.392 119.049 259.95 120.066 260.587 121.137C261.224 122.209 261.922 123.304 263.382 125.86"
+            stroke="#2C2C2C" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="M196.43 477.612C195.881 479.157 191.216 490.799 185.924 500.561C182.657 505.973 180.116 510.105 178.924 511.835C178.359 512.64 177.874 513.296 176.091 515.595"
+            stroke="#2C2C2C" stroke-width="9" stroke-linecap="round" />
+          <path
+            d="M372.627 483.683C377.777 490.104 389.729 506.371 391.729 510.306C392.241 511.215 392.895 512.231 393.531 513.112C394.166 513.993 394.763 514.708 395.738 515.806"
+            stroke="#2C2C2C" stroke-width="9" stroke-linecap="round" />
+          <circle cx="277.113" cy="276.573" r="18" fill="#2C2C2C" />
+          <path d="M277.113 241V268.694" stroke="#2C2C2C" stroke-width="10" stroke-linecap="round" />
+          <path
+            d="M260.131 39.9646C260.092 38.8589 260.131 37.0875 260.122 32.3792C260.111 26.4091 260.604 23.911 260.971 22.8653C261.156 22.3391 261.608 21.9371 262.173 21.637C266.732 19.2177 278.634 19.822 283.096 20.1373C285.31 20.2936 287.224 21.2086 289.112 23.1682C291.219 25.3538 291.347 29.1703 291.815 31.6663C291.894 32.4467 291.932 33.4114 291.971 34.351C292.01 35.2905 292.049 36.1756 292.089 37.0875"
+            stroke="#2C2C2C" stroke-width="10" stroke-linecap="round" />
+        </svg>
+
+        <!-- Pause work-duration slot — the real #work-field-group is moved here on pause -->
+        <div id="pause-work-slot"></div>
+
+        <div class="timer-btns">
+          <button class="timer-btn" id="pause-btn">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <rect x="2.5" y="1.5" width="3.5" height="13" rx="1.5" fill="#2C2C2C" />
+              <rect x="10" y="1.5" width="3.5" height="13" rx="1.5" fill="#2C2C2C" />
+            </svg>
+            Pause
+          </button>
+          <button class="timer-btn" id="restart-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M5.58021 16.2893C5.10418 15.4166 4.01079 15.095 3.13807 15.571C2.26534 16.0471 1.94376 17.1404 2.41979 18.0132L4 17.1512L5.58021 16.2893ZM17.0889 8.88469L17.8995 7.27756L17.8994 7.27749L17.0889 8.88469ZM19.5 15.0849H17.7C17.7 17.8953 15.7662 19.829 12.9556 19.829V21.629V23.429C17.7542 23.429 21.3 19.8838 21.3 15.0849H19.5ZM12.9556 21.629V19.829C11.1316 19.829 9.70264 19.6575 8.53588 19.1568C7.43177 18.683 6.43672 17.8596 5.58021 16.2893L4 17.1512L2.41979 18.0132C3.62995 20.2318 5.21036 21.6472 7.1162 22.4651C8.9594 23.2561 10.9749 23.429 12.9556 23.429V21.629ZM9.16667 8.19609V9.99609C9.74597 9.99609 10.3835 9.92966 10.9395 9.8753C11.5303 9.81754 12.1055 9.76413 12.7035 9.75388C13.8785 9.73374 15.072 9.8835 16.2784 10.4919L17.0889 8.88469L17.8994 7.27749C16.0058 6.32256 14.1813 6.12802 12.6418 6.15441C11.8825 6.16742 11.1763 6.23499 10.5892 6.29238C9.96738 6.35318 9.53051 6.39609 9.16667 6.39609V8.19609ZM17.0889 8.88469L16.2782 10.4918C16.5928 10.6505 16.9962 11.1282 17.306 12.1558C17.5974 13.1223 17.7 14.2381 17.7 15.0849H19.5H21.3C21.3 14.0134 21.1769 12.5234 20.7527 11.1165C20.347 9.77068 19.5448 8.10747 17.8995 7.27756L17.0889 8.88469Z"
+                fill="#262626" />
+              <path
+                d="M10.2034 2C10.1545 2.26767 9.52096 4.09566 9.13492 5.18116C8.80688 6.10359 8.07068 7.21004 7.74292 7.75971C7.38429 8.36117 7.03901 8.76533 6.79323 9.23795C6.48772 9.82545 8.34312 10.131 9.53799 10.7595C11.4757 11.7856 12.0591 12.0664 12.6194 12.2388C12.7564 12.2751 12.896 12.3144 13.2319 12.4027"
+                stroke="#262626" stroke-width="3.6" stroke-linecap="round" />
+            </svg>
+            Restart
+          </button>
+        </div>
+
+        <p class="timer-tab-hint"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="7" cy="7" r="6" stroke="#7a6e67" stroke-width="1.4"/><line x1="7" y1="6" x2="7" y2="10.5" stroke="#7a6e67" stroke-width="1.4" stroke-linecap="round"/><circle cx="7" cy="4.2" r="0.85" fill="#7a6e67"/></svg>Keep this tab open for the alarm to work</p>
+
+      </div><!-- /.timer-screen-inner -->
+    </div>
+
+    <!-- ══════════════════════════════════════════════════
+       END-OF-TIMER MODAL
+  ══════════════════════════════════════════════════ -->
+    <div class="modal-backdrop" id="done-modal" role="dialog" aria-modal="true" aria-labelledby="modal-heading">
+      <div class="modal-card">
+        <p class="modal-heading" id="modal-heading">Well done!<br>Time to touch some grass and stretch</p>
+
+        <div class="modal-img" id="modal-img-area">
+          <img src="cat-rolling.gif" alt="" />
+        </div>
+
+        <div class="modal-btns">
+          <button class="modal-snooze-btn" id="modal-snooze-btn">Snooze</button>
+          <button class="modal-rest-btn" id="modal-rest-btn">I'll rest up</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════
+       BREAK SCREEN
+    ══════════════════════════════════════════════════ -->
+    <div id="break-screen" class="screen hidden">
+      <div class="break-inner">
+        <div class="break-timer-display" id="break-timer-display">05:00</div>
+        <p class="break-copy">Rest up! You deserve it.<br>Walk, stretch, hydrate and come back refreshed.</p>
+        <button id="break-back-btn" class="break-back-btn">I'm back</button>
+      </div>
+    </div>
+
+  </div><!-- /.app -->
+
+  <script>
+    /* ═══════════════════════════════════════════════════════
+       SNOOZE POLICE — script.js
+    ═══════════════════════════════════════════════════════ */
+
+    /* ── 1. SVG INJECTION ── */
+    const borderTpl = document.getElementById('tpl-border');
+    const pillTpl = document.getElementById('tpl-pill');
+
+    function injectBorder(id) {
+      const el = document.getElementById(id);
+      if (!el || !borderTpl) return;
+      el.insertBefore(borderTpl.content.cloneNode(true), el.firstChild);
+    }
+    function injectPill(id) {
+      const el = document.getElementById(id);
+      if (!el || !pillTpl) return;
+      el.insertBefore(pillTpl.content.cloneNode(true), el.firstChild);
+    }
+
+    injectBorder('name-shell');
+    injectBorder('work-shell');
+    injectBorder('break-shell');
+
+    ['wp0', 'wp1', 'wp2'].forEach(injectPill);
+
+
+    /* ── 2. SHARED STATE ── */
+    let workMins = 25;  // 1–60
+    let breakMins = 5;   // 3–15
+
+    const WK_MIN = 1, WK_MAX = 60, WK_STEP = 1;
+    const BK_MIN = 3, BK_MAX = 15, BK_STEP = 1;
+
+    // Timer
+    let timerTotal = 25 * 60;
+    let timerLeft = 25 * 60;
+    let timerRunning = false;
+    let timerRAF = null;   // requestAnimationFrame handle — replaces setInterval for clock updates
+    let pausedDuration = 25 * 60;
+
+    // Snooze resistance
+    let snoozeCount = 0;
+    let hasUsedFullResistance = false;
+    let modalStack = []; // tracks cards for stacked-card push-back effect
+
+
+    /* ── 3. UTILITIES ── */
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+    function fmtMins(m) { return m === 1 ? '1 min' : `${m} mins`; }
+
+    // Show a transient helper message in a .field-msg element.
+    // Disappears after `delay` ms (default 2500) or on next interaction.
+    let _msgTimers = {};
+    function showMsg(elId, text, delay = 2500) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      clearTimeout(_msgTimers[elId]);
+      el.textContent = text;
+      el.classList.add('visible');
+      _msgTimers[elId] = setTimeout(() => {
+        el.classList.remove('visible');
+      }, delay);
+    }
+    function clearMsg(elId) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      clearTimeout(_msgTimers[elId]);
+      el.classList.remove('visible');
+    }
+
+    // Update disabled visual state of +/- buttons
+    function updateStepperState(minusId, plusId, value, min, max) {
+      const minus = document.getElementById(minusId);
+      const plus = document.getElementById(plusId);
+      if (!minus || !plus) return;
+
+      if (value <= min) {
+        minus.classList.add('disabled');
+        minus.setAttribute('aria-disabled', 'true');
+      } else {
+        minus.classList.remove('disabled');
+        minus.removeAttribute('aria-disabled');
+      }
+
+      if (value >= max) {
+        plus.classList.add('disabled');
+        plus.setAttribute('aria-disabled', 'true');
+      } else {
+        plus.classList.remove('disabled');
+        plus.removeAttribute('aria-disabled');
+      }
+    }
+
+    // Sync pill fill colours
+    function syncPills(groupId, currentMins) {
+      document.querySelectorAll(`#${groupId} .pill-shell`).forEach(shell => {
+        const btn = shell.querySelector('button');
+        const active = Number(btn.dataset.mins) === currentMins;
+        btn.classList.toggle('active', active);
+        const fp = shell.querySelector('.pill-fill-path');
+        if (fp) fp.setAttribute('fill', active ? '#f5c6d2' : '#FAFAFA');
+      });
+    }
+
+
+    /* ── 4. WORK DURATION ── */
+    const workDisplay = document.getElementById('work-display');
+    const workInput = document.getElementById('work-input');
+
+    function renderWork(userChanged = false) {
+      workDisplay.textContent = fmtMins(workMins);
+      workDisplay.style.color = userChanged ? '#262626' : '';
+      syncPills('work-presets', workMins);
+      updateStepperState('work-minus', 'work-plus', workMins, WK_MIN, WK_MAX);
+
+      // While paused on the timer screen, only reset the timer if the user explicitly
+      // changed the duration — keeps resume-from-position intact otherwise.
+      if (isPaused && userChanged) {
+        timerTotal = workMins * 60;
+        timerLeft = workMins * 60;
+        drawSegment(timerLeft, timerTotal);
+      }
+    }
+
+    // Stepper ±1 min — works even when input is in edit mode (mousedown logic)
+    document.getElementById('work-minus').addEventListener('click', () => {
+      if (workMins <= WK_MIN) {
+        showMsg('work-msg', `Min work duration is 1 min`);
+        return;
+      }
+      workMins = clamp(workMins - WK_STEP, WK_MIN, WK_MAX);
+      clearMsg('work-msg');
+      if (wEditing) { workInput.value = String(workMins); workInput.style.color = '#262626'; }
+      renderWork(true);
+    });
+
+    document.getElementById('work-plus').addEventListener('click', () => {
+      if (workMins >= WK_MAX) {
+        showMsg('work-msg', `Max work duration is 60 mins`);
+        return;
+      }
+      workMins = clamp(workMins + WK_STEP, WK_MIN, WK_MAX);
+      clearMsg('work-msg');
+      if (wEditing) { workInput.value = String(workMins); workInput.style.color = '#262626'; }
+      renderWork(true);
+    });
+
+    // Prevent mousedown from blurring input when stepper btns clicked
+    document.getElementById('work-minus').addEventListener('mousedown', e => e.preventDefault());
+    document.getElementById('work-plus').addEventListener('mousedown', e => e.preventDefault());
+
+    // Arrow key support on the stepper value area (works in both display and edit mode)
+    document.getElementById('work-val').addEventListener('keydown', e => {
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        document.getElementById('work-plus').click();
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        document.getElementById('work-minus').click();
+      }
+    });
+
+    // Make the value area keyboard-focusable so arrow keys work without clicking first
+    document.getElementById('work-val').setAttribute('tabindex', '0');
+
+    // Click-to-edit
+    let wEditing = false;
+
+    document.getElementById('work-val').addEventListener('click', () => {
+      if (wEditing) return;
+      wEditing = true;
+      workDisplay.style.display = 'none';
+      workInput.style.display = 'block';
+      workInput.value = String(workMins);
+      workInput.style.color = '#b0a89f';
+      workInput.focus();
+      workInput.select();
+    });
+
+    workInput.addEventListener('input', () => {
+      workInput.value = workInput.value.replace(/\D/g, '');
+      workInput.style.color = '#262626';
+      clearMsg('work-msg');
+    });
+
+    workInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); workInput.blur(); }
+      if (e.key === 'Escape') { wEditing = false; _cancelWork(); }
+    });
+
+    function commitWork() {
+      if (!wEditing) return;
+      wEditing = false;
+      workInput.style.display = 'none';
+      workDisplay.style.display = '';
+      const raw = parseInt(workInput.value, 10);
+      if (!isNaN(raw)) {
+        if (raw === 0) {
+          workMins = WK_MIN;
+          showMsg('work-msg', `Min work duration is 1 min`);
+        } else if (raw > WK_MAX) {
+          workMins = WK_MAX;
+          showMsg('work-msg', `Max work duration is 60 mins`);
+        } else {
+          workMins = raw;
+        }
+      }
+      renderWork(true);
+    }
+    function _cancelWork() {
+      workInput.style.display = 'none';
+      workDisplay.style.display = '';
+      renderWork(false);
+    }
+    workInput.addEventListener('blur', commitWork);
+
+    // Presets
+    document.querySelectorAll('#work-presets .preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        workMins = Number(btn.dataset.mins);
+        if (wEditing) { wEditing = false; workInput.style.display = 'none'; workDisplay.style.display = ''; }
+        clearMsg('work-msg');
+        renderWork(true);
+      });
+    });
+
+
+    /* ── 5. BREAK DURATION ── */
+    const breakDisplay = document.getElementById('break-display');
+    const breakInput = document.getElementById('break-input');
+
+    function renderBreak(userChanged = false) {
+      breakDisplay.textContent = fmtMins(breakMins);
+      breakDisplay.style.color = userChanged ? '#262626' : '';
+      updateStepperState('break-minus', 'break-plus', breakMins, BK_MIN, BK_MAX);
+    }
+
+    document.getElementById('break-minus').addEventListener('click', () => {
+      if (breakMins <= BK_MIN) {
+        showMsg('break-msg', `Min break duration is 3 mins`);
+        return;
+      }
+      breakMins = clamp(breakMins - BK_STEP, BK_MIN, BK_MAX);
+      clearMsg('break-msg');
+      if (bEditing) { breakInput.value = String(breakMins); breakInput.style.color = '#262626'; }
+      renderBreak(true);
+    });
+
+    document.getElementById('break-plus').addEventListener('click', () => {
+      if (breakMins >= BK_MAX) {
+        showMsg('break-msg', `Max break duration is 15 mins`);
+        return;
+      }
+      breakMins = clamp(breakMins + BK_STEP, BK_MIN, BK_MAX);
+      clearMsg('break-msg');
+      if (bEditing) { breakInput.value = String(breakMins); breakInput.style.color = '#262626'; }
+      renderBreak(true);
+    });
+
+    document.getElementById('break-minus').addEventListener('mousedown', e => e.preventDefault());
+    document.getElementById('break-plus').addEventListener('mousedown', e => e.preventDefault());
+
+    document.getElementById('break-val').setAttribute('tabindex', '0');
+    document.getElementById('break-val').addEventListener('keydown', e => {
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        document.getElementById('break-plus').click();
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        document.getElementById('break-minus').click();
+      }
+    });
+
+    let bEditing = false;
+
+    document.getElementById('break-val').addEventListener('click', () => {
+      if (bEditing) return;
+      bEditing = true;
+      breakDisplay.style.display = 'none';
+      breakInput.style.display = 'block';
+      breakInput.value = String(breakMins);
+      breakInput.style.color = '#b0a89f';
+      breakInput.focus();
+      breakInput.select();
+    });
+
+    breakInput.addEventListener('input', () => {
+      breakInput.value = breakInput.value.replace(/\D/g, '');
+      breakInput.style.color = '#262626';
+      clearMsg('break-msg');
+    });
+
+    breakInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); breakInput.blur(); }
+      if (e.key === 'Escape') { bEditing = false; _cancelBreak(); }
+    });
+
+    function commitBreak() {
+      if (!bEditing) return;
+      bEditing = false;
+      breakInput.style.display = 'none';
+      breakDisplay.style.display = '';
+      const raw = parseInt(breakInput.value, 10);
+      if (!isNaN(raw)) {
+        if (raw < BK_MIN) {
+          breakMins = BK_MIN;
+          showMsg('break-msg', `Min break duration is 3 mins`);
+        } else if (raw > BK_MAX) {
+          breakMins = BK_MAX;
+          showMsg('break-msg', `Max break duration is 15 mins`);
+        } else {
+          breakMins = raw;
+        }
+      }
+      renderBreak(true);
+    }
+    function _cancelBreak() {
+      breakInput.style.display = 'none';
+      breakDisplay.style.display = '';
+      renderBreak(false);
+    }
+    breakInput.addEventListener('blur', commitBreak);
+
+
+    /* ── 6. CLOCK SECTOR DRAWING ── */
+    /*
+      The orange shape is a FILLED PIE SLICE (sector) drawn with an SVG path.
+    
+      Clock geometry:
+        Center:  CX=277.113, CY=276.573  (clock hand pivot, from SVG)
+        Radius:  R=200  (reaches just inside the decorative ring border)
+    
+      Coordinate system reminder (SVG):
+        - x increases RIGHT
+        - y increases DOWN (opposite of standard math)
+        - "12 o'clock" top = (CX, CY - R)
+    
+      Sector start: always 12 o'clock (top of clock), fixed.
+      Sector sweeps: ANTI-CLOCKWISE by `angleDeg`.
+    
+      Anti-clockwise in SVG screen space = sweep-flag 0.
+    
+      Point on circle at angle θ anti-clockwise from 12 o'clock:
+        x = CX - R × sin(θ)      ← negative sin moves LEFT (anti-clockwise)
+        y = CY - R × cos(θ)      ← minus cos: at θ=0 gives top (CY-R); at θ=180 gives bottom (CY+R)
+    
+      SVG arc path for the sector:
+        M CX CY               — move to center
+        L startX startY        — line to 12 o'clock (start of arc)
+        A R R 0 largeArc 0     — arc, counter-clockwise (sweep=0)
+          endX endY            —   to end point
+        Z                      — close back to center
+    
+      large-arc-flag = 1 when angleDeg > 180°, else 0.
+    
+      Timer countdown mapping:
+        Full 60-min clock face = 360°.
+        Remaining time in seconds → remaining minutes → degrees.
+        angleDeg = (timerLeft / 60) × 6     (since 1 min = 6°)
+    */
+
+    // R = 165: outer edge sits at the digit/tick-mark ring, not the full face border
+    const CX = 277.113, CY = 276.573, R = 165;
+
+    /**
+     * Build an SVG 'd' string for a pie sector.
+     * @param {number} angleDeg  Arc span in degrees (0 = nothing, 360 = full circle)
+     * @returns {string} SVG path data
+     */
+    function sectorPath(angleDeg) {
+      if (angleDeg <= 0) return '';
+
+      // Full circle: SVG can't draw a 360° arc in one command,
+      // so we use a well-known trick — two 180° arcs joined.
+      if (angleDeg >= 359.99) {
+        return [
+          `M ${CX} ${CY}`,
+          `L ${CX} ${(CY - R).toFixed(3)}`,
+          `A ${R} ${R} 0 1 0 ${CX} ${(CY + R).toFixed(3)}`,  // top → bottom (CW half)
+          `A ${R} ${R} 0 1 0 ${CX} ${(CY - R).toFixed(3)}`,  // bottom → top (CW half)
+          'Z'
+        ].join(' ');
+      }
+
+      const θ = angleDeg * Math.PI / 180;
+
+      // 12 o'clock — fixed start of the sector
+      const startX = CX;
+      const startY = CY - R;
+
+      // End of arc, swept anti-clockwise by θ from 12 o'clock
+      const endX = CX - R * Math.sin(θ);
+      const endY = CY - R * Math.cos(θ);
+
+      // large-arc-flag: 1 if the arc spans more than a semicircle
+      const largeArc = angleDeg > 180 ? 1 : 0;
+
+      return [
+        `M ${CX} ${CY}`,
+        `L ${startX.toFixed(3)} ${startY.toFixed(3)}`,
+        `A ${R} ${R} 0 ${largeArc} 0 ${endX.toFixed(3)} ${endY.toFixed(3)}`,
+        'Z'
+      ].join(' ');
+    }
+
+    /**
+     * Update the orange sector on the clock face.
+     * @param {number} remainSecs  Seconds remaining on the countdown
+     * @param {number} totalSecs   Total session duration in seconds (used to know initial mins)
+     */
+    function drawSegment(remainSecs, totalSecs) {
+      const seg = document.getElementById('timer-segment');
+      if (!seg) return;
+
+      if (remainSecs <= 0) {
+        seg.setAttribute('d', '');
+        return;
+      }
+
+      // Map to the 60-min clock face: (remaining seconds ÷ 60) × 6° per min
+      const remainingMins = remainSecs / 60;         // e.g. 25 → 150
+      const angleDeg = remainingMins * 6;        // 1 min = 6°; 60 min = 360°
+
+      seg.setAttribute('d', sectorPath(angleDeg));
+    }
+
+
+    /* ── 7. TIMER ENGINE ── */
+
+    let timerStartedAt = null;
+    let timerLeftAtStart = 0;
+    let notificationShown = false;
+    let timerCompletedAt = null;
+
+    /*
+      Web Worker backup timer — fires handleTimerComplete() even in background tabs.
+      Workers run in a separate thread and are NOT subject to Chrome's "intensive
+      throttling" that kills main-thread setTimeout in background tabs after 5 min.
+      We create the worker from a Blob so the entire app stays a single HTML file.
+    */
+    const _workerCode = `
+      var t = null;
+      self.onmessage = function(e) {
+        if (e.data.type === 'start') {
+          clearTimeout(t);
+          t = setTimeout(function() { self.postMessage({ type: 'done' }); }, e.data.ms);
+        } else if (e.data.type === 'stop') {
+          clearTimeout(t);
+          t = null;
+        }
+      };
+    `;
+    const timerWorker = new Worker(
+      URL.createObjectURL(new Blob([_workerCode], { type: 'text/javascript' }))
+    );
+    timerWorker.onmessage = (e) => {
+      if (e.data.type !== 'done') return;
+      if (!timerRunning) return; // rAF already handled it
+      timerRunning = false;
+      cancelAnimationFrame(timerRAF); timerRAF = null;
+      stopAudioKeepalive();
+      handleTimerComplete();
+    };
+
+    /* Silent-audio keepalive — keeps AudioContext "playing" so Android Chrome
+       doesn't suspend it when the tab is backgrounded.
+       iOS will still kill background audio; nothing we can do about that. */
+    let keepAliveOsc = null;
+    let keepAliveGain = null;
+
+    function startAudioKeepalive() {
+      if (!alarmCtx || keepAliveOsc) return;
+      try {
+        if (alarmCtx.state === 'suspended') alarmCtx.resume();
+        keepAliveGain = alarmCtx.createGain();
+        keepAliveGain.gain.value = 0.0001; // –80 dB — completely inaudible
+        keepAliveOsc = alarmCtx.createOscillator();
+        keepAliveOsc.frequency.value = 1; // 1 Hz sub-audible
+        keepAliveOsc.connect(keepAliveGain);
+        keepAliveGain.connect(alarmCtx.destination);
+        keepAliveOsc.start();
+      } catch (e) { /* non-critical */ }
+    }
+
+    function stopAudioKeepalive() {
+      try { if (keepAliveOsc) { keepAliveOsc.stop(); keepAliveOsc.disconnect(); } } catch(e) {}
+      try { if (keepAliveGain) keepAliveGain.disconnect(); } catch(e) {}
+      keepAliveOsc = null;
+      keepAliveGain = null;
+    }
+
+    /*
+      tick() is defined in outer scope (not inside startTimer) so the
+      visibilitychange handler can re-queue it after returning from background —
+      iOS Safari does not always auto-resume a paused rAF loop on tab return.
+    */
+    function tick() {
+      if (!timerRunning) return;
+
+      const elapsed = Math.floor((Date.now() - timerStartedAt) / 1000);
+      const newLeft = Math.max(0, timerLeftAtStart - elapsed);
+
+      // Only redraw when the second ticks — avoids redundant DOM writes at 60fps
+      if (newLeft !== timerLeft) {
+        timerLeft = newLeft;
+        drawSegment(timerLeft, timerTotal);
+
+        if (timerLeft <= 0) {
+          timerRAF = null;
+          timerRunning = false;
+          timerWorker.postMessage({ type: 'stop' }); // cancel backup — we're handling it
+          stopAudioKeepalive();
+          handleTimerComplete();
+          return;
+        }
+      }
+
+      timerRAF = requestAnimationFrame(tick);
+    }
+
+    function startTimer() {
+      if (timerRAF) cancelAnimationFrame(timerRAF);
+      timerWorker.postMessage({ type: 'stop' }); // cancel any previous backup
+
+      if (Notification && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+
+      timerRunning = true;
+      timerStartedAt = Date.now();
+      timerLeftAtStart = timerLeft;
+      notificationShown = false;
+
+      // rAF: smooth visual updates at 60fps when tab is active
+      timerRAF = requestAnimationFrame(tick);
+
+      // Backup worker timer: fires handleTimerComplete even when rAF is paused.
+      // Web Workers are NOT subject to Chrome's "intensive throttling" in background
+      // tabs — unlike main-thread setTimeout, they fire accurately at any time.
+      // +500ms so rAF gets first shot when the tab is active.
+      timerWorker.postMessage({ type: 'start', ms: timerLeft * 1000 + 500 });
+
+      // Keep AudioContext alive so Android Chrome can play the alarm while backgrounded.
+      // We create alarmCtx here too — startTimer is always called from a click handler
+      // so we're guaranteed to be inside a user gesture, satisfying autoplay policy.
+      // (The document-level unlockAudio listener fires in the bubble phase, AFTER this
+      //  code, so we can't rely on it having run yet.)
+      if (!alarmCtx) {
+        alarmCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      startAudioKeepalive();
+    }
+
+    function pauseTimer() {
+      if (timerRAF) { cancelAnimationFrame(timerRAF); timerRAF = null; }
+      timerWorker.postMessage({ type: 'stop' });
+      stopAudioKeepalive();
+      timerRunning = false;
+    }
+
+    function restartTimer() {
+      pauseTimer();
+      timerLeft = timerTotal;
+      drawSegment(timerLeft, timerTotal);
+      startTimer();
+    }
+
+
+    /* ── 8. ALARM & NOTIFICATIONS ── */
+
+    let alarmCtx = null;
+    let alarmActive = false;
+    let alarmTimeout = null;
+
+    // Create AudioContext on first interaction to satisfy autoplay policy.
+    document.addEventListener('click', function unlockAudio() {
+      if (!alarmCtx) {
+        alarmCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+    }, { once: true });
+
+    // Plays a single clean sine-wave beep (250ms, soft attack/release — no clicks).
+    function beep() {
+      if (!alarmCtx) alarmCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (alarmCtx.state === 'suspended') alarmCtx.resume();
+
+      const osc  = alarmCtx.createOscillator();
+      const gain = alarmCtx.createGain();
+      osc.connect(gain);
+      gain.connect(alarmCtx.destination);
+
+      osc.type = 'sine';
+      osc.frequency.value = 880;   // A5 — clean timer-like tone
+
+      const t = alarmCtx.currentTime;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.35, t + 0.01);  // 10ms attack
+      gain.gain.setValueAtTime(0.35, t + 0.23);
+      gain.gain.linearRampToValueAtTime(0, t + 0.25);     // 20ms release
+
+      osc.start(t);
+      osc.stop(t + 0.25);   // self-cleans up, no abrupt cut
+    }
+
+    // Pattern: beep(250ms) → pause(800ms) → beep(250ms) → pause(2000ms) → repeat
+    function startAlarm() {
+      if (alarmActive) return;
+      alarmActive = true;
+      if (!alarmCtx) alarmCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+      function runPattern() {
+        if (!alarmActive) return;
+        if (alarmCtx.state === 'suspended') alarmCtx.resume();
+
+        beep();
+        alarmTimeout = setTimeout(() => {
+          if (!alarmActive) return;
+          beep();
+          alarmTimeout = setTimeout(runPattern, 2250); // 250ms beep + 2000ms pause
+        }, 1050); // 250ms beep + 800ms pause
+      }
+
+      runPattern();
+    }
+
+    function stopAlarm() {
+      alarmActive = false;
+      clearTimeout(alarmTimeout);
+      alarmTimeout = null;
+      // AudioContext keeps running (cheap to leave idle); oscillators self-terminate.
+    }
+
+    function showNotification() {
+      if (!Notification || Notification.permission !== 'granted') return;
+
+      const n = new Notification("Time's up", {
+        body: "Go stretch. You earned it."
+      });
+
+      n.onclick = () => {
+        window.focus();
+        openDoneModal();
+      };
+    }
+
+    function openDoneModal() {
+      const modal = document.getElementById('done-modal');
+      if (modal) {
+        modal.classList.add('visible');
+      }
+    }
+
+    function handleTimerComplete() {
+      timerCompletedAt = Date.now(); // mark so visibilitychange can re-fire on return
+      startAlarm();
+
+      if (!notificationShown) {
+        showNotification();
+        notificationShown = true;
+      }
+
+      // Show modal reliably, regardless of visibilityState
+      openDoneModal();
+    }
+
+    // "I'll rest up" — stop alarm, close everything, go to break/setup
+    const modalRestBtn = document.getElementById('modal-rest-btn');
+    if (modalRestBtn) {
+      modalRestBtn.addEventListener('click', () => {
+        stopAlarm();
+        closeAllModals();
+        if (typeof goToBreak === 'function') {
+          goToBreak();
+        } else if (typeof goToSetup === 'function') {
+          goToSetup();
+        }
+      });
+    }
+
+    // "Snooze" — stop alarm immediately, then enter resistance flow
+    const modalSnoozeBtn = document.getElementById('modal-snooze-btn');
+    if (modalSnoozeBtn) {
+      modalSnoozeBtn.addEventListener('click', () => {
+        stopAlarm();
+        // If already snoozed before, go straight to post-snooze popup (level 3)
+        if (hasUsedFullResistance) {
+          showResistanceModal(3);
+        } else {
+          showResistanceModal(1);
+        }
+      });
+    }
+
+
+    /* ── SNOOZE RESISTANCE SYSTEM ── */
+
+    // Content library — messages and GIFs are paired, {name} is replaced at runtime.
+    // Add more items to any category; one is picked randomly each time.
+    const RESISTANCE_CONTENT = {
+      first: [
+        {
+          heading: "Take a chill pill. Your mind works better after a pause.",
+          gif: "https://c.tenor.com/rWiseRi_9AAAAAAd/tenor.gif"
+        },
+        {
+          heading: "If grinding actually worked, you would already be done by now.",
+          gif: "https://c.tenor.com/SK_vjfLtlO0AAAAC/tenor.gif"
+        },
+        {
+          heading: "{name}, your brain doesn’t need more grinding. It needs oxygen.",
+          gif: "https://media.tenor.com/_9OLppUkThUAAAAi/cute-excited.gif"
+        },
+        {
+          heading: "Try stepping away for a minute. Your best ideas rarely strike at the desk.",
+          gif: "https://c.tenor.com/qaPmgwBrIqMAAAAd/tenor.gif"
+        },
+         {
+          heading: "Your mind clears faster on a walk than staring at the same screen.",
+          gif: "https://c.tenor.com/S7kJuFLAOB0AAAAC/tenor.gif"
+        },
+         {
+          heading: "By all means, keep grinding. Your posture loves this for you.",
+          gif: "https://c.tenor.com/2eodrpO7SVwAAAAC/tenor.gif"
+        },
+        {
+          heading: "5 minutes of walk can add to your life span, while another 5 minutes of grind can definitely give you back problems.",
+          gif: "https://c.tenor.com/8yz4-PSdk7QAAAAd/tenor.gif"
+        },
+        {
+          heading: "Go on for a light walk, your work will still be there when you get back.",
+          gif: "https://c.tenor.com/ddr6H6M7YPEAAAAd/tenor.gif"
+        },
+      ],
+      second: [
+        {
+          heading: "Hey, did you know that there is more to life than just staring at a screen?",
+          gif: "https://c.tenor.com/KbS5ZQFVpAMAAAAC/tenor.gif"
+        },
+        {
+          heading: "Your best ideas don’t strike while you stare at the screen. They show up when you give your mind room to wander.",
+          gif: "https://c.tenor.com/o3uKmiVo3aQAAAAd/tenor.gif"
+        },
+        {
+          heading: "The mind was built to explore, not just process tasks. Step away and let it breathe.",
+          gif: "https://c.tenor.com/-YrIQq6Or_QAAAAd/tenor.gif"
+        },
+        {
+          heading: "You’ve been “almost done” for the last 40 minutes, it’s time you take a break.",
+          gif: "https://c.tenor.com/UgYOhU0trLMAAAAC/tenor.gif"
+        },
+        {
+          heading: "Your brain is begging for oxygen but, by all means, hit snooze",
+          gif: "https://c.tenor.com/ZhhV44K8FyYAAAAd/tenor.gif"
+        },
+        {
+          heading: "Wow, you’ve been “almost done” for an impressive amount of time now.",
+          gif: "https://c.tenor.com/s3Vd6aDe3QwAAAAC/tenor.gif"
+        },
+        {
+          heading: "Another few minutes won’t magically solve it, but it’s sweet that you believe that.",
+          gif: "https://c.tenor.com/iGbPsCaFC8wAAAAd/tenor.gif"
+        },
+        {
+          heading: "Go on for a light walk, your work will still be there when you get back.",
+          gif: "https://c.tenor.com/ddr6H6M7YPEAAAAd/tenor.gif"
+        },
+        {
+          heading: "Step away for a moment. Fresh air does wonders for stuck thoughts.",
+          gif: "https://c.tenor.com/7HsvsAGfoWwAAAAC/tenor.gif"
+        },
+      ],
+      postSnooze: [
+        {
+          heading: "I see, snoozing again. Is it really that hard to make a choice between a breather and future back pain?",
+          gif: "https://media.tenor.com/K2b1IoIfqy0AAAAj/glasses-surprised.gif"
+        },
+        {
+          heading: "Another snooze? Your posture is crying.",
+          gif: "https://c.tenor.com/pUEfgZca2UkAAAAd/tenor.gif"
+        },
+        {
+          heading: "Another snooze! {name}, I feel bad for your posture.",
+          gif: "https://c.tenor.com/xgglewjfv6oAAAAC/tenor.gif"
+        },
+        {
+          heading: "Another snooze! I am sorry, are we saving lives here that you can’t take a quick breather?",
+          gif: "https://c.tenor.com/ThnF2OsqApEAAAAd/tenor.gif"
+        },
+        {
+          heading: "Just take a break already! You have been glued to that chair since forever.",
+          gif: "https://c.tenor.com/A_ATMsLJ6qAAAAAC/tenor.gif"
+        },
+         {
+          heading: "At this point, I feel like you literally don’t care about your health.",
+          gif: "https://c.tenor.com/ciNDyf6AgH0AAAAd/tenor.gif"
+        },
+         {
+          heading: "Did you know that every minute you sit here stressed, it is chipping away from your lifeline? Process that while you walk.",
+          gif: "https://media.tenor.com/YvkL3-ItcNkAAAAi/yup-yupforreal.gif"
+        },
+         {
+          heading: "You could step outside. Look at the sky. Stretch for a minute. But sure, open another tab.",
+          gif: "https://c.tenor.com/ToWTWsqmmcsAAAAd/tenor.gif"
+        },
+         {
+          heading: "Did you know people who take breaks think better and live longer?",
+          gif: "https://c.tenor.com/nzEDTfOn-V4AAAAC/tenor.gif"
+        },
+      ]
+    };
+
+    function pickRandom(arr) {
+      return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    function resolveName() {
+      const input = document.getElementById('name-input');
+      return (input && input.value.trim()) || 'friend';
+    }
+
+    function resolveContent(category) {
+      const item = pickRandom(RESISTANCE_CONTENT[category]);
+      const name = resolveName();
+      return {
+        heading: item.heading.replace(/\{name\}/g, name),
+        gif: item.gif
+      };
+    }
+
+    function closeAllModals() {
+      const done = document.getElementById('done-modal');
+      if (done) done.classList.remove('visible');
+      document.querySelectorAll('.resistance-modal').forEach(m => m.remove());
+      // Reset done-modal card position and brightness
+      const doneCard = document.querySelector('#done-modal .modal-card');
+      if (doneCard) { doneCard.style.transform = ''; doneCard.classList.remove('stacked-behind'); delete doneCard.dataset.stackX; delete doneCard.dataset.stackY; }
+      modalStack = [];
+    }
+
+    function activateSnooze() {
+      stopAlarm();
+      closeAllModals();
+      hasUsedFullResistance = true;
+      snoozeCount++;
+      timerTotal = 5 * 60;
+      timerLeft = 5 * 60;
+      drawSegment(timerLeft, timerTotal);
+      startTimer();
+      showSnoozeToast();
+    }
+
+    // New card slides in from the right (Windows notification style).
+    // Existing cards shift UP-LEFT so the new card appears bottom-right of the stack.
+    const STACK_DX = -52, STACK_DY = -32;
+
+    function nudgeCardsBack() {
+      const allCards = [
+        document.querySelector('#done-modal .modal-card'),
+        ...modalStack.map(({ card }) => card)
+      ].filter(Boolean);
+      allCards.forEach(card => {
+        const x = Number(card.dataset.stackX || 0) + STACK_DX;
+        const y = Number(card.dataset.stackY || 0) + STACK_DY;
+        card.dataset.stackX = x; card.dataset.stackY = y;
+        // Instant — no transition, old cards don't animate
+        card.style.transition = 'none';
+        card.style.transform = `translate(${x}px, ${y}px)`;
+      });
+    }
+
+    // level: 1 = first, 2 = second, 3 = post-snooze
+    function showResistanceModal(level) {
+      const category = level === 1 ? 'first' : level === 2 ? 'second' : 'postSnooze';
+      const content = resolveContent(category);
+      // Button styling: levels 1/2 use rest-lvl-1 or rest-lvl-2; post-snooze reuses rest-lvl-2
+      const restLvlClass = level === 1 ? 'rest-lvl-1' : 'rest-lvl-2';
+
+      const backdrop = document.createElement('div');
+      backdrop.className = 'modal-backdrop resistance-modal';
+      backdrop.setAttribute('role', 'dialog');
+      backdrop.setAttribute('aria-modal', 'true');
+      backdrop.style.zIndex = 100 + level;
+      backdrop.style.background = 'transparent';
+
+      // GIF: show img if URL provided, fallback to placeholder
+      const imgInner = content.gif
+        ? `<img src="${content.gif}" alt="" loading="lazy" />`
+        : `<span class="modal-img-placeholder">[ GIF goes here ]</span>`;
+
+      backdrop.innerHTML = `
+        <div class="modal-card">
+          <p class="modal-heading">${content.heading}</p>
+          <div class="modal-img">${imgInner}</div>
+          <div class="modal-btns">
+            <button class="modal-snooze-btn js-r-snooze">Let me snooze</button>
+            <button class="modal-rest-btn js-r-rest ${restLvlClass} rest-pulse">Fine, break time</button>
+          </div>
+        </div>
+      `;
+
+      // Dull every card already in the stack, plus the done-modal card behind it all
+      modalStack.forEach(({ card: c }) => c.classList.add('stacked-behind'));
+      const doneCard = document.querySelector('#done-modal .modal-card');
+      if (doneCard) doneCard.classList.add('stacked-behind');
+
+      document.querySelector('.app').appendChild(backdrop);
+      const card = backdrop.querySelector('.modal-card');
+      // Offset = position in the visual stack × step size.
+      // modalStack.length before push = number of cards already on screen (not counting done-modal).
+      // +1 accounts for the done-modal sitting behind everything.
+      // On mobile we shrink the step so cards never overflow the viewport.
+      const step = window.innerWidth < 600 ? 10 : 80;
+      const offset = (modalStack.length + 1) * step;
+      card.style.marginLeft = offset + 'px';
+      card.style.marginTop  = offset + 'px';
+      card.style.transition = 'none';
+      card.style.transform = 'scale(0.88)';
+      card.dataset.stackX = 0; card.dataset.stackY = 0;
+      modalStack.push({ card });
+
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        backdrop.classList.add('visible');
+        card.style.transition = 'transform 0.14s ease-out';
+        card.style.transform = 'scale(1)';
+      }));
+
+      backdrop.querySelector('.js-r-rest').addEventListener('click', () => {
+        stopAlarm();
+        closeAllModals();
+        if (typeof goToBreak === 'function') goToBreak();
+        else goToSetup();
+      });
+
+      backdrop.querySelector('.js-r-snooze').addEventListener('click', () => {
+        backdrop.style.pointerEvents = 'none';
+        if (level === 1 && !hasUsedFullResistance) {
+          // First time: show second resistance
+          showResistanceModal(2);
+        } else {
+          // Already gone through full resistance, or post-snooze: go straight to snooze
+          activateSnooze();
+        }
+      });
+    }
+
+    function showSnoozeToast() {
+      const toast = document.createElement('div');
+      toast.className = 'snooze-toast';
+      toast.textContent = 'Snoozed for 5 mins';
+      document.body.appendChild(toast);
+      // Slide down
+      requestAnimationFrame(() => requestAnimationFrame(() => toast.classList.add('visible')));
+      // After 1s slide back up and remove
+      setTimeout(() => {
+        toast.classList.remove('visible');
+        toast.addEventListener('transitionend', () => toast.remove(), { once: true });
+      }, 1000);
+    }
+
+
+    /* ── Page Visibility API ──
+       Two cases when the user returns to this tab:
+
+       A) timerRunning=true  → the interval was throttled while hidden, timer never
+          finished in JS. Recompute from wall-clock; if time is up, fire completion.
+
+       B) timerRunning=false + timerCompletedAt set → timer DID finish while hidden
+          (interval ran, timerRunning=false), but audio was likely silenced by the OS.
+          Re-open the modal and restart the alarm now that we're foregrounded again.
+    */
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') return;
+
+      // Try to unblock the AudioContext the moment the tab comes back — works on
+      // Android; on iOS a tap is still needed but the modal gives them that tap.
+      if (alarmCtx && alarmCtx.state === 'suspended') alarmCtx.resume();
+
+      if (timerRunning) {
+        // Case A: resync from wall clock, then re-queue rAF loop.
+        // iOS does not reliably auto-resume a paused rAF on tab return —
+        // we must explicitly re-queue tick() here.
+        const elapsed = Math.floor((Date.now() - timerStartedAt) / 1000);
+        timerLeft = Math.max(0, timerLeftAtStart - elapsed);
+        drawSegment(timerLeft, timerTotal);
+        if (timerLeft <= 0) {
+          cancelAnimationFrame(timerRAF); timerRAF = null;
+          timerWorker.postMessage({ type: 'stop' });
+          timerRunning = false;
+          stopAudioKeepalive();
+          handleTimerComplete();
+        } else {
+          // Re-queue the tick loop — safe even if it was already running
+          cancelAnimationFrame(timerRAF);
+          timerRAF = requestAnimationFrame(tick);
+          startAudioKeepalive(); // re-attach keepalive if it dropped
+        }
+      } else if (timerCompletedAt !== null) {
+        // Case B: timer already done, re-fire alarm + ensure modal is visible
+        if (!alarmActive) startAlarm();
+        openDoneModal();
+      }
+    });
+
+    /* ── playDone kept for backwards compat (now wraps openDoneModal) ── */
+    function playDone() { openDoneModal(); }
+
+    /* ── 8. PAUSE / RESUME / RESTART ── */
+    const pauseBtn = document.getElementById('pause-btn');
+    const restartBtn = document.getElementById('restart-btn');
+
+    let isPaused = false;
+
+    /* Handdrawn-style icons — match the uploaded SVGs exactly */
+    const PAUSE_ICON = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="1.5" width="3.5" height="13" rx="1.5" fill="#2C2C2C"/><rect x="10" y="1.5" width="3.5" height="13" rx="1.5" fill="#2C2C2C"/></svg>`;
+    const RESUME_ICON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5.2067 13.1084C5.1215 11.9595 5.05502 8.48522 5.0223 5.47443C5.00554 3.9325 6.67859 2.95639 8.03719 3.68578C10.8063 5.17239 14.6841 7.14098 18.5 8.77637C23.3274 10.8453 15.1152 16.9156 8.48231 20.8524C7.16026 21.6371 5.52807 20.6368 5.53407 19.0995C5.53734 18.2642 5.53197 17.5583 5.52209 17.0242C5.45851 15.5191 5.37395 14.5034 5.2067 13.1084Z" stroke="#262626" stroke-width="5" stroke-linecap="round"/></svg>`;
+
+    // Elements for pause UI
+    const pauseWorkSlot = document.getElementById('pause-work-slot');
+    const workFieldGroup = document.getElementById('work-field-group');
+    const timerInner = document.querySelector('.timer-screen-inner');
+
+    // Remember where the field-group lives in setup so we can return it exactly
+    const workFieldGroupHome = workFieldGroup.parentNode;       // #setup-screen
+    const workFieldGroupSibling = workFieldGroup.nextSibling;     // node after it (break field-group)
+
+    /**
+     * Toggle the pause state UI:
+     *  paused=true  → clock shrinks up, real work-duration field moves into timer screen
+     *  paused=false → clock restores, field returns to its original place in setup screen
+     */
+    function setPauseUI(paused) {
+      if (paused) {
+        // 1. Animate clock up and smaller
+        timerInner.classList.add('is-paused');
+
+        // Sync workMins to remaining time, ceiling to nearest whole minute.
+        // e.g. 43 secs left → 1 min; 2m 10s left → 3 mins.
+        // Resuming uses timerLeft directly so the actual countdown is unaffected.
+        workMins = Math.max(WK_MIN, Math.ceil(timerLeft / 60));
+        renderWork(false);
+
+        // 2. Physically move the existing work field-group into the slot.
+        //    All event listeners, validation, SVG borders, pills travel with the node — nothing duplicated.
+        pauseWorkSlot.appendChild(workFieldGroup);
+
+        // 3. Fade the slot in (rAF gives the browser one frame to register the node before transitioning)
+        requestAnimationFrame(() => pauseWorkSlot.classList.add('visible'));
+
+      } else {
+        // 1. Restore clock
+        timerInner.classList.remove('is-paused');
+
+        // 2. Hide slot first, then return field-group to setup screen
+        pauseWorkSlot.classList.remove('visible');
+
+        // Return the field-group to its exact original position in the setup screen.
+        // insertBefore(node, null) === appendChild, so this handles both "last child" and mid-list cases.
+        workFieldGroupHome.insertBefore(workFieldGroup, workFieldGroupSibling);
+      }
+    }
+
+    pauseBtn.addEventListener('click', () => {
+      if (!isPaused) {
+        pauseTimer();
+        isPaused = true;
+        pauseBtn.innerHTML = RESUME_ICON + ' Resume';
+        setPauseUI(true);
+      } else {
+        isPaused = false;
+        pauseBtn.innerHTML = PAUSE_ICON + ' Pause';
+        setPauseUI(false);
+        startTimer();
+      }
+    });
+
+    restartBtn.addEventListener('click', () => {
+      isPaused = false;
+      pauseBtn.innerHTML = PAUSE_ICON + ' Pause';
+      setPauseUI(false);
+      restartTimer();
+    });
+
+
+    /* ── 9. SCREEN TRANSITIONS ── */
+
+    /* ── BREAK SCREEN ── */
+    let breakInterval = null;
+    let breakLeft = 0;
+
+    function fmtTime(secs) {
+      const m = Math.floor(secs / 60);
+      const s = secs % 60;
+      return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
+
+    function goToBreak() {
+      stopAlarm();
+      closeAllModals();
+      pauseTimer();
+      isPaused = false;
+      setPauseUI(false);
+
+      document.getElementById('setup-screen').classList.add('hidden');
+      document.getElementById('timer-screen').classList.add('hidden');
+      document.getElementById('break-screen').classList.remove('hidden');
+
+      // Reset display
+      const display = document.getElementById('break-timer-display');
+      display.classList.remove('break-done');
+      breakLeft = breakMins * 60;
+      display.textContent = fmtTime(breakLeft);
+
+      // Start break countdown
+      if (breakInterval) clearInterval(breakInterval);
+      breakInterval = setInterval(() => {
+        breakLeft = Math.max(0, breakLeft - 1);
+        display.textContent = fmtTime(breakLeft);
+        if (breakLeft <= 0) {
+          clearInterval(breakInterval);
+          breakInterval = null;
+          // Timer hit 0 — pulse display to nudge user, but don't auto-navigate
+          display.classList.add('break-done');
+        }
+      }, 1000);
+    }
+
+    document.getElementById('break-back-btn').addEventListener('click', () => {
+      if (breakInterval) { clearInterval(breakInterval); breakInterval = null; }
+      document.getElementById('break-screen').classList.add('hidden');
+      goToSetup();
+    });
+
+    function goToTimer() {
+      const secs = workMins * 60;
+      timerTotal = secs;
+      timerLeft = secs;
+      pausedDuration = secs;
+      isPaused = false;
+      snoozeCount = 0;
+      hasUsedFullResistance = false;
+      timerCompletedAt = null;
+      timerWorker.postMessage({ type: 'stop' });
+      pauseBtn.innerHTML = PAUSE_ICON + ' Pause';
+      document.getElementById('setup-screen').classList.add('hidden');
+      document.getElementById('timer-screen').classList.remove('hidden');
+      drawSegment(timerLeft, timerTotal);
+      startTimer();
+    }
+
+    function goToSetup() {
+      pauseTimer();
+      isPaused = false;
+      setPauseUI(false);
+      document.getElementById('timer-screen').classList.add('hidden');
+      document.getElementById('break-screen').classList.add('hidden');
+      document.getElementById('setup-screen').classList.remove('hidden');
+    }
+
+    document.getElementById('start-btn').addEventListener('click', () => {
+      const nameVal = document.getElementById('name-input').value.trim();
+      if (!nameVal) {
+        showMsg('name-msg', 'I need your name to get started.', 99999);
+        document.getElementById('name-input').focus();
+        return;
+      }
+      clearMsg('name-msg');
+      goToTimer();
+    });
+
+    // Clear the error as soon as they start typing
+    document.getElementById('name-input').addEventListener('input', () => clearMsg('name-msg'));
+    document.getElementById('back-btn').addEventListener('click', goToSetup);
+
+
+    /* ── 11. INIT ── */
+    renderWork(false);
+    renderBreak(false);
+  </script>
+</body>
+
+</html>
